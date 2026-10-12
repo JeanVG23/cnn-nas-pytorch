@@ -1,0 +1,14 @@
+.venv/
+docs/
+__pycache__/
+.pytest_cache/
+.ruff_cache/
+*.egg-info/
+
+# Datasets et artefacts volumineux
+data/
+experiments/results/
+
+# Fichiers de configuration IDE/Assistants locaux
+CLAUDE.md
+GEMINI.md
