@@ -1,0 +1,1076 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Étape 1 : autograd, expliqué en manipulant</title>
+<style>
+:root {
+  --bg: #f7f7f4;
+  --surface: #ffffff;
+  --surface2: #efefe9;
+  --text: #1d1f23;
+  --muted: #5d6470;
+  --line: #d9d9d0;
+  --accent: #d9480f;
+  --pos: #ff922b;
+  --on-strong: #14161a;
+  --hl: #7048e8;
+  --ok: #2b8a3e;
+  --bad: #c92a2a;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #14161a;
+    --surface: #1d2026;
+    --surface2: #262a32;
+    --text: #eceae4;
+    --muted: #a0a6b0;
+    --line: #353a44;
+    --accent: #ff922b;
+    --hl: #9775fa;
+    --ok: #69db7c;
+    --bad: #ff8787;
+  }
+}
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; scroll-padding-top: 64px; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font: 16px/1.6 system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+.wrap { max-width: 980px; margin: 0 auto; padding: 0 16px; }
+
+/* En-tête et navigation */
+header.hero { padding: 40px 0 16px; }
+header.hero h1 { font-size: clamp(1.7rem, 5vw, 2.5rem); line-height: 1.2; margin: 0 0 12px; }
+.lead { font-size: 1.1rem; color: var(--muted); max-width: 68ch; margin: 0; }
+nav.top {
+  position: sticky; top: 0; z-index: 10;
+  background: color-mix(in srgb, var(--bg) 92%, transparent);
+  backdrop-filter: blur(6px);
+  border-bottom: 1px solid var(--line);
+}
+nav.top .wrap { display: flex; gap: 4px 14px; flex-wrap: wrap; padding-top: 10px; padding-bottom: 10px; }
+nav.top a { color: var(--muted); text-decoration: none; font-size: .9rem; font-weight: 600; }
+nav.top a:hover { color: var(--accent); }
+
+/* Sections */
+section { padding: 36px 0 8px; }
+section h2 { font-size: 1.5rem; margin: 0 0 8px; }
+section h2 .n {
+  display: inline-grid; place-items: center; width: 1.7em; height: 1.7em;
+  border-radius: 50%; background: var(--accent); color: #fff; font-size: .8em; margin-right: 8px;
+}
+@media (prefers-color-scheme: dark) { section h2 .n { color: #14161a; } }
+p { margin: 0 0 12px; max-width: 74ch; }
+a { color: var(--hl); }
+.muted { color: var(--muted); }
+.card {
+  background: var(--surface); border: 1px solid var(--line);
+  border-radius: 12px; padding: 16px; margin: 14px 0;
+}
+.card h3, .card h4 { margin: 0 0 6px; }
+.card h3 { font-size: 1.05rem; }
+code, .mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .92em; }
+.tip {
+  border-left: 4px solid var(--hl); background: var(--surface2);
+  padding: 10px 14px; border-radius: 0 8px 8px 0; margin: 14px 0; max-width: 74ch;
+}
+.warn {
+  border-left: 4px solid var(--bad); background: var(--surface2);
+  padding: 10px 14px; border-radius: 0 8px 8px 0; margin: 14px 0; max-width: 74ch;
+}
+.warn code, .err { word-break: break-word; }
+.err { font: 13px/1.5 ui-monospace, Menlo, monospace; color: var(--bad); margin: 6px 0; }
+
+/* Boutons et champs */
+.row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 10px 0; }
+button {
+  font: inherit; font-size: .9rem; cursor: pointer;
+  background: var(--surface); color: var(--text);
+  border: 1px solid var(--line); border-radius: 8px; padding: 6px 12px;
+}
+button:hover { border-color: var(--accent); }
+button.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+@media (prefers-color-scheme: dark) { button.on { color: #14161a; } }
+button:disabled { opacity: .5; cursor: default; }
+input[type="range"] { accent-color: var(--accent); width: min(100%, 320px); }
+input[type="checkbox"] { accent-color: var(--accent); width: 18px; height: 18px; }
+label.f { font-size: .9rem; color: var(--muted); }
+label.chk { display: flex; gap: 8px; align-items: center; cursor: pointer; }
+
+/* Tables de nombres */
+.tblwrap { overflow-x: auto; padding-bottom: 6px; }
+table.pt { border-collapse: collapse; font-size: .9rem; width: 100%; }
+table.pt th, table.pt td { padding: 5px 8px; border-bottom: 1px solid var(--line); text-align: left; white-space: nowrap; }
+table.pt th { color: var(--muted); font-size: .8rem; }
+table.pt td.num { font-family: ui-monospace, Menlo, monospace; text-align: right; }
+table.pt tr.dim td { opacity: .3; }
+table.pt tr.cur td { background: color-mix(in srgb, var(--hl) 16%, var(--surface)); }
+.up { color: var(--ok); font-weight: 700; }
+.down { color: var(--bad); font-weight: 700; }
+.two { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 14px; }
+.two h4 { font-size: .95rem; }
+
+/* Curseurs */
+.sl { display: grid; grid-template-columns: 34px 1fr 56px; gap: 10px; align-items: center; margin: 4px 0; max-width: 520px; }
+.sl input[type="range"] { width: 100%; }
+.sl output { font: 600 13px ui-monospace, Menlo, monospace; text-align: right; }
+.sl b { font-family: ui-monospace, Menlo, monospace; }
+
+.formula { font: 13px/1.7 ui-monospace, Menlo, monospace; background: var(--surface2); border-radius: 8px; padding: 8px 12px; margin: 6px 0; overflow-x: auto; white-space: pre; }
+.pt.wrap td, .pt.wrap th { white-space: normal; vertical-align: top; text-align: left; }
+.pt.wrap td:nth-child(2) { min-width: 240px; }
+.resume { max-width: 74ch; padding-left: 1.4em; }
+.resume li { margin: 6px 0; }
+.codeblock { margin: 12px 0; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); }
+.codeblock summary { cursor: pointer; padding: 8px 12px; font-weight: 600; }
+.codeblock summary .muted { font-weight: 400; }
+.codeblock pre { margin: 0; padding: 8px 12px; background: var(--surface2); border-top: 1px solid var(--line); font: 13px/1.6 ui-monospace, Menlo, monospace; overflow-x: auto; white-space: pre; }
+.codeblock .ln { display: inline-block; width: 3.2ch; margin-right: 1.2ch; color: var(--muted); text-align: right; user-select: none; }
+.codeblock .gap { color: var(--muted); padding-left: 4.4ch; }
+.codeblock .map { margin: 0; padding: 8px 12px; border-top: 1px solid var(--line); font-size: .92rem; }
+.verdict { font-size: 1.05rem; font-weight: 700; margin-top: 8px; }
+.bad { color: var(--bad); }
+.stats { display: flex; flex-wrap: wrap; gap: 10px 26px; margin: 8px 0; }
+.stat b { display: block; font: 700 1.2rem ui-monospace, Menlo, monospace; }
+.stat span { font-size: .8rem; color: var(--muted); }
+canvas.cv { width: 100%; max-width: 640px; height: auto; display: block; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); }
+
+/* Chaîne de la passe avant */
+.chain-wrap { overflow-x: auto; padding: 4px 0 8px; margin: 4px 0 10px; }
+.chain { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 4px; margin: 4px 0; }
+.cell { background: var(--surface2); border: 1px solid var(--line); border-radius: 7px; padding: 4px 8px; text-align: center; min-width: 64px; box-shadow: 0 1px 2px rgba(0,0,0,0.03); }
+
+.cell small { display: block; color: var(--muted); font-size: .72rem; font-weight: 500; margin-bottom: 1px; }
+.cell b { font: 700 .88rem ui-monospace, Menlo, monospace; }
+.cell.out { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 10%, var(--surface2)); outline: 2px solid var(--accent); }
+.op-connector { display: flex; align-items: center; gap: 3px; color: var(--hl); font: 600 .8rem ui-monospace, Menlo, monospace; }
+.op-arrow { color: var(--muted); font-size: .85rem; opacity: 0.6; user-select: none; }
+.opchip { background: color-mix(in srgb, var(--hl) 12%, var(--surface2)); border: 1px solid color-mix(in srgb, var(--hl) 30%, transparent); border-radius: 5px; padding: 3px 6px; color: var(--hl); white-space: nowrap; font-size: .8rem; }
+
+
+/* Grille des 5 postes de travail */
+.postes-title { font-size: .88rem; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; margin: 16px 0 8px; }
+.postes-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 10px; margin: 6px 0 14px; }
+.poste-card { background: var(--surface2); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; display: flex; flex-direction: column; gap: 4px; transition: border-color .15s ease; }
+.poste-card.poste-loss { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 7%, var(--surface2)); }
+.poste-header { display: flex; justify-content: space-between; align-items: center; font-size: .74rem; color: var(--muted); border-bottom: 1px solid color-mix(in srgb, var(--line) 80%, transparent); padding-bottom: 4px; margin-bottom: 2px; }
+.poste-num { font-weight: 700; color: var(--text); }
+.poste-role { font-size: .7rem; color: var(--muted); }
+.poste-formula { font-family: ui-monospace, Menlo, monospace; font-size: .82rem; color: var(--hl); font-weight: 600; }
+.poste-calc { font-family: ui-monospace, Menlo, monospace; font-size: .8rem; color: var(--muted); }
+.poste-res { margin-top: auto; padding-top: 4px; font-family: ui-monospace, Menlo, monospace; font-size: .95rem; color: var(--text); }
+.poste-card.poste-loss .poste-formula { color: var(--accent); }
+.poste-card.poste-loss .poste-res { color: var(--accent); }
+
+/* Barre de score & verdict */
+.s1-eval-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 16px 24px; padding: 12px 16px; background: color-mix(in srgb, var(--surface2) 70%, var(--surface)); border: 1px solid var(--line); border-radius: 10px; margin: 12px 0; }
+.s1-metric { display: flex; flex-direction: column; }
+.s1-metric span, .s1-target span { font-size: .75rem; color: var(--muted); text-transform: uppercase; letter-spacing: .03em; }
+.s1-metric b { font: 700 1.3rem ui-monospace, Menlo, monospace; color: var(--text); }
+.s1-metric b.up { color: var(--ok); }
+.s1-target b { font: 600 .95rem ui-monospace, Menlo, monospace; }
+.s1-verdict-box { flex: 1; min-width: 200px; font-weight: 600; font-size: .95rem; }
+
+
+/* Graphe de calcul */
+svg.g4 { width: 100%; min-width: 760px; height: auto; display: block; }
+svg.g4 .box { fill: var(--surface); stroke: var(--line); stroke-width: 1.5; }
+svg.g4 .gn.done .box { fill: color-mix(in srgb, var(--pos) 24%, var(--surface)); stroke: var(--pos); }
+svg.g4 .gn.act .box { stroke: var(--accent); stroke-width: 4; }
+svg.g4 .ttl { font: 700 12px ui-monospace, Menlo, monospace; fill: var(--text); }
+svg.g4 .sub { font: 12px ui-monospace, Menlo, monospace; fill: var(--muted); }
+svg.g4 .val { font: 600 11px ui-monospace, Menlo, monospace; fill: var(--muted); }
+svg.g4 .gv { font: 700 11px ui-monospace, Menlo, monospace; fill: var(--accent); }
+svg.g4 .edge { stroke: var(--muted); stroke-width: 1.5; fill: none; }
+svg.g4 .edge.dash { stroke-dasharray: 4 3; }
+svg.g4 .ah { fill: var(--muted); }
+svg.g4 .pill rect { fill: var(--surface2); stroke: var(--line); stroke-width: 1.5; }
+svg.g4 .pill.leaf rect { stroke: var(--hl); stroke-width: 2; }
+svg.g4 .lg { font: 600 11px system-ui, sans-serif; fill: var(--muted); }
+
+/* Quiz */
+.quiz-head { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; justify-content: space-between; margin-bottom: 4px; }
+.quiz-head .score { font-weight: 700; }
+.q { border: 1px solid var(--line); border-radius: 10px; padding: 14px; margin: 14px 0; background: var(--surface); }
+.q .qt { font-weight: 700; margin: 0 0 4px; max-width: none; }
+.q .hint { font-size: .85rem; color: var(--muted); margin: 0 0 8px; }
+.q .tag { display: inline-block; font-size: .7rem; font-weight: 700; letter-spacing: .03em; text-transform: uppercase; padding: 2px 8px; border-radius: 99px; background: var(--surface2); color: var(--muted); margin-right: 6px; vertical-align: 2px; }
+.q .tag.trap { background: var(--bad); color: #fff; }
+.q .tag.multi { background: var(--hl); color: #fff; }
+@media (prefers-color-scheme: dark) { .q .tag.trap, .q .tag.multi { color: #14161a; } }
+.opt { display: flex; gap: 10px; align-items: flex-start; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; margin: 6px 0; cursor: pointer; }
+.opt input { margin-top: 5px; accent-color: var(--accent); flex: 0 0 auto; }
+.opt .ot { min-width: 0; }
+.opt .why { display: none; font-size: .88rem; color: var(--muted); margin-top: 4px; }
+.q.done .opt { cursor: default; }
+.q.done .opt .why { display: block; }
+.opt.good { border-color: var(--ok); background: color-mix(in srgb, var(--ok) 13%, var(--surface)); }
+.opt.wrong { border-color: var(--bad); background: color-mix(in srgb, var(--bad) 13%, var(--surface)); }
+.opt.miss { border-color: var(--ok); border-style: dashed; }
+.q .explain { display: none; border-left: 4px solid var(--hl); background: var(--surface2); padding: 10px 14px; border-radius: 0 8px 8px 0; margin-top: 10px; }
+.q.done .explain { display: block; }
+.q .explain p { max-width: none; margin: 0 0 8px; }
+.q .res { font-weight: 700; margin-top: 8px; }
+.q .res.ok { color: var(--ok); } .q .res.part { color: var(--accent); } .q .res.ko { color: var(--bad); }
+
+footer { padding: 36px 0 60px; color: var(--muted); font-size: .85rem; }
+</style>
+</head>
+<body>
+
+<header class="hero">
+  <div class="wrap">
+    <h1>Comment PyTorch calcule-t-il les gradients tout seul ?</h1>
+    <p class="lead">Étape 1 du projet : un réseau à 2 neurones, <code>steps/s01_autograd.py</code>. Tu as déjà fait la rétropropagation à la main (mini_llm) ; ici on regarde ce qui est propre à PyTorch : le graphe de calcul, le piège de l'accumulation de <code>.grad</code>, <code>no_grad</code> et <code>detach</code>. Sept sections, chacune avec quelque chose à manipuler, puis un quiz.</p>
+    <div class="warn" id="nodata" hidden>Fichier <code>donnees/s01.js</code> introuvable : les comparaisons avec le vrai PyTorch sont désactivées. Relance <code>uv run python explications/s01-autograd/scripts/exporter_s01.py</code> depuis la racine du projet.</div>
+  </div>
+</header>
+
+<nav class="top">
+  <div class="wrap">
+    <a href="#s1">1. Passe avant</a>
+    <a href="#s2">2. Pente</a>
+    <a href="#s3">3. Règle de la chaîne</a>
+    <a href="#s4">4. Graphe</a>
+    <a href="#s5">5. Accumulation</a>
+    <a href="#s6">6. no_grad, detach</a>
+    <a href="#s7">7. Descente</a>
+    <a href="#bilan">Bilan</a>
+<a href="#resume">Résumé</a>
+    <a href="#quiz">Quiz</a>
+  </div>
+</nav>
+
+<main class="wrap">
+
+<div class="card" id="inputs">
+  <h3>Ton réseau (toute la page s'y applique)</h3>
+  <p class="muted">Le réseau du code : <code>h = tanh(w1 * x)</code>, <code>y_hat = w2 * h</code>, <code>loss = (y_hat - y) ** 2</code>. Une seule donnée (x, y), deux poids (w1, w2). Les valeurs du rapport sont x = 0,5 ; y = 1 ; w1 = 0,8 ; w2 = −0,4.</p>
+  <div id="sliders"></div>
+  <div class="row">
+    <button id="pRapport">Valeurs du rapport</button>
+    <button id="pSature">Tanh saturée (x = 2, w1 = 3)</button>
+    <button id="pZero">Loss presque nulle (w2 = 2,65)</button>
+  </div>
+</div>
+
+<!-- 1 --------------------------------------------------------------- -->
+<section id="s1">
+  <h2><span class="n">1</span>La passe avant : une chaîne de petites opérations</h2>
+  <p>Imagine une chaîne de montage à cinq postes. Chaque poste fait une opération minuscule sur le nombre qu'il reçoit : multiplier, passer dans <code>tanh</code>, multiplier encore, soustraire la cible, élever au carré. À la sortie, un seul nombre : la <b>loss</b>, qui mesure à quel point on se trompe (0 = parfait). Calculer la sortie de gauche à droite s'appelle la <b>passe avant</b> (<code>forward</code> dans le code).</p>
+  <p><b>À toi :</b> règle w1 et w2 (curseurs du haut) pour faire passer la loss sous 0,01. Observe quel poste change quand tu touches chaque curseur. Tu fais à la main ce qu'un algorithme devrait faire seul.</p>
+  <div class="card">
+    <div class="chain-wrap">
+      <div class="chain" id="s1chain"></div>
+    </div>
+    <div class="postes-title">Les 5 postes de calcul décomposés :</div>
+    <div class="postes-grid" id="s1postes"></div>
+    <div class="s1-eval-bar">
+      <div class="s1-metric">
+        <span>Perte actuelle (loss)</span>
+        <b id="s1lossval">-</b>
+      </div>
+      <div class="s1-target">
+        <span>Objectif</span>
+        <b>loss &lt; 0,01</b>
+      </div>
+      <div class="s1-verdict-box" id="s1verdict"></div>
+      <div id="s1stats" hidden></div>
+    </div>
+    <div class="row"><button id="s1reveal">Révéler une solution (garde w1, ajuste w2)</button><span class="muted" id="s1msg"></span></div>
+  </div>
+  <details class="codeblock" open data-code="20-25"><summary>Dans le code : <code>forward</code> <span class="muted">(<span class="cf"></span>)</span></summary><pre></pre><p class="map">Les cinq postes de la chaîne sont ces trois lignes : l.22 fait « × w1 » puis <code>tanh</code>, l.23 fait « × w2 », l.24 soustrait <code>y</code> puis élève au carré. La page recalcule la même chose à chaque mouvement de curseur.</p></details>
+  <div class="tip"><b>À retenir :</b> la loss est un nombre unique construit par une chaîne d'opérations élémentaires. Avec 2 poids on tâtonne encore ; avec des millions il faudra savoir dans quel sens bouger chaque poids sans tâtonner. C'est le rôle du gradient.</div>
+</section>
+
+<!-- 2 --------------------------------------------------------------- -->
+<section id="s2">
+  <h2><span class="n">2</span>Le gradient est une pente</h2>
+  <p>Tu es dans le brouillard sur une colline et tu veux descendre. Tu ne vois rien, mais tu sens la pente sous tes pieds. Le <b>gradient</b> d'un poids, c'est cette pente : de combien la loss monte (ou descend) quand on augmente ce poids d'une toute petite quantité, rapporté à cette quantité. Pente positive : augmenter le poids fait monter la loss, donc pour descendre il faut <b>diminuer</b> le poids.</p>
+  <p><b>À toi :</b> choisis un poids, puis réduis ε (la taille du petit pas avec lequel on « tâte » la pente). La pente mesurée entre deux points (pointillés violets) doit se rapprocher de la vraie pente (tangente orange). Déplace aussi w1 ou w2 avec les curseurs du haut : la tangente suit.</p>
+  <div class="card">
+    <div class="row">
+      <span class="muted">Poids étudié :</span>
+      <button id="s2w1" class="on">w1</button><button id="s2w2">w2</button>
+    </div>
+    <div class="sl" style="grid-template-columns:34px 1fr 90px"><b>ε</b><input type="range" id="s2eps" min="-8" max="0" step="0.1" value="-1" aria-label="epsilon (puissance de 10)"><output id="s2epso"></output></div>
+    <canvas class="cv" id="c2" width="640" height="300"></canvas>
+    <div class="stats" id="s2stats"></div>
+    <div id="s2msg"></div>
+  </div>
+  <details class="codeblock" open data-code="81-83"><summary>Dans le code : la mise à jour des poids <span class="muted">(<span class="cf"></span>)</span></summary><pre></pre><p class="map">Le code de l'étape ne « tâte » jamais la pente : ce que tu manipules ici (ε) sert seulement à comprendre ce qu'est un gradient. Ce que le code fait du gradient est l.82-83 : on <b>soustrait</b> <code>lr * w1.grad</code>, donc on va dans le sens opposé à la pente. La pente exacte vient de <code>manual_grads</code> (section 3) ou de <code>backward()</code> (section 4).</p></details>
+  <div class="tip"><b>À retenir :</b> gradient = pente de la loss par rapport à un poids. Il indique le sens où la loss monte ; on se déplace dans le sens opposé. Mesurer la pente en tâtant coûte une passe avant par poids ; avec des millions de poids ce serait impraticable. La règle de la chaîne (section suivante) donne tous les gradients exactement, en une seule passe arrière.</div>
+</section>
+
+<!-- 3 --------------------------------------------------------------- -->
+<section id="s3">
+  <h2><span class="n">3</span>Calculer le gradient à la main : la règle de la chaîne</h2>
+  <p>Chaque poste de la chaîne de montage sait dire comment sa sortie réagit à son entrée : c'est sa <b>dérivée locale</b>. Si w1 bouge de 1, a bouge de x ; si a bouge de 1, h bouge de (1 − h²) ; si h bouge de 1, ŷ bouge de w2 ; et ainsi de suite jusqu'à la loss. Les effets d'une chaîne se <b>multiplient</b>. On remonte donc la chaîne depuis la loss, en multipliant à chaque maillon par la dérivée locale. C'est la fonction <code>manual_grads</code>.</p>
+  <p><b>À toi :</b> avance le curseur pas à pas. À chaque ligne, relis le calcul « valeur précédente × dérivée locale = nouvelle valeur » et retrouve la ligne de code correspondante. Essaie ensuite le préréglage « Tanh saturée » en haut de la page.</p>
+  <div class="card">
+    <div class="row">
+      <label class="f" for="s3k">Étape</label>
+      <input type="range" id="s3k" min="0" max="7" step="1" value="0">
+      <button id="s3play">Animer</button><button id="s3all">Tout afficher</button>
+    </div>
+    <div class="tblwrap"><table class="pt" id="s3tbl"></table></div>
+    <div class="formula" id="s3code"></div>
+    <div class="stats" id="s3stats"></div>
+  </div>
+  <details class="codeblock" open data-code="28-35"><summary>Dans le code : <code>manual_grads</code> <span class="muted">(<span class="cf"></span>)</span></summary><pre></pre><p class="map">Le tableau d'étapes déroule ces lignes : l.32 est <code>d_y_hat</code>, l.33 est <code>dw2</code>, l.34 est <code>dw1</code> (avec les trois facteurs w2, 1 − h², x).</p></details>
+  <div class="tip"><b>À retenir :</b> dw2 = d_y_hat × h et dw1 = d_y_hat × w2 × (1 − h²) × x : un produit de dérivées locales, du bout de la chaîne jusqu'au poids. Si un seul facteur est quasi nul (tanh saturée : 1 − h² ≈ 0), tout le produit s'effondre : w1 n'apprend plus, même si l'erreur est grande.</div>
+</section>
+
+<!-- 4 --------------------------------------------------------------- -->
+<section id="s4">
+  <h2><span class="n">4</span>Autograd : PyTorch note le graphe pendant la passe avant</h2>
+  <p>Tu viens de faire la règle de la chaîne à la main. PyTorch la fait pour toi, mais comment sait-il quelles opérations ont eu lieu ? Pendant la passe avant, <b>chaque opération sur un tenseur qui requiert un gradient écrit une fiche</b> : « je suis le résultat d'une multiplication, voici mes entrées, voici comment me dériver ». Cette fiche s'appelle <code>grad_fn</code> ; l'ensemble des fiches forme le <b>graphe de calcul</b>. Puis <code>loss.backward()</code> relit les fiches à l'envers et applique à chaque nœud sa dérivée locale : exactement la section 3, de façon mécanique.</p>
+  <p>Les poids w1 et w2 sont les <b>feuilles</b> du graphe (<code>requires_grad=True</code>, pas de <code>grad_fn</code>). Chaque feuille est reliée à un nœud <code>AccumulateGrad</code> qui range le gradient dans <code>.grad</code>. Les constantes x et y (de simples nombres Python) ne sont pas suivies : pas de nœud.</p>
+  <p><b>À toi :</b> fais défiler <code>backward()</code> étape par étape. Observe l'ordre de parcours (de la loss vers les feuilles) et compare les résultats finaux avec le calcul à la main et le vrai PyTorch.</p>
+  <div class="card">
+    <div class="row">
+      <label class="f" for="s4k">Étape de backward()</label>
+      <input type="range" id="s4k" min="0" max="7" step="1" value="0">
+      <button id="s4play">Animer</button><button id="s4all">Tout afficher</button>
+    </div>
+    <div class="tblwrap"><svg class="g4" id="s4svg" viewBox="0 0 920 300" role="img" aria-label="Graphe de calcul du réseau"></svg></div>
+    <div id="s4msg" class="muted"></div>
+  </div>
+  <div class="two">
+    <div class="card"><h4>Propriétés des tenseurs (après la passe avant)</h4><div class="tblwrap"><table class="pt" id="s4props"></table></div></div>
+    <div class="card"><h4>À la main, autograd, PyTorch réel</h4><div class="tblwrap"><table class="pt" id="s4cmp"></table></div><div class="muted" id="s4note"></div></div>
+  </div>
+  <details class="codeblock" open data-code="45-49,61-71"><summary>Dans le code : <code>autograd_grads</code> et <code>graph_nodes</code> <span class="muted">(<span class="cf"></span>)</span></summary><pre></pre><p class="map">L.48 <code>loss.backward()</code> est ce que fait le bouton « Animer » ; l.49 lit <code>.grad</code> sur les deux feuilles. <code>graph_nodes</code> parcourt <code>grad_fn.next_functions</code> en profondeur : c'est le graphe dessiné ci-dessus, et c'est lui qui renvoie 7 nœuds (deux <code>AccumulateGrad</code>).</p></details>
+  <div class="tip"><b>À retenir :</b> le graphe se construit pendant la passe avant, pas pendant <code>backward()</code>. L'autograd n'est pas une approximation numérique : c'est la même règle de la chaîne, appliquée nœud par nœud. Si les nombres diffèrent à la 8e décimale en float32, c'est de l'arrondi, pas une erreur de méthode ; d'où <code>dtype=torch.float64</code> dans le code, et une tolérance de 1e-9 dans les tests.</div>
+</section>
+
+<!-- 5 --------------------------------------------------------------- -->
+<section id="s5">
+  <h2><span class="n">5</span>Le piège : backward() additionne</h2>
+  <p>Imagine que <code>.grad</code> est un seau. <code>backward()</code> <b>verse</b> le gradient dedans ; il ne le vide jamais. Si tu appelles <code>backward()</code> deux fois sans vider le seau, tu y trouves la somme des deux versements. PyTorch fonctionne ainsi parce qu'un même poids peut servir à plusieurs endroits du réseau : chaque usage verse sa contribution et elles doivent s'additionner. Le prix à payer : c'est à toi de vider le seau à chaque tour de boucle.</p>
+  <p><b>À toi :</b> clique plusieurs fois sur « forward + backward ». Regarde <code>w1.grad</code> : combien vaut-il par rapport au gradient d'un seul appel ? Puis vide le seau, et essaie le bouton « backward() seul » juste après un backward.</p>
+  <div class="card">
+    <div class="row">
+      <button id="s5go" class="on">forward + backward</button>
+      <button id="s5again">backward() seul, sur le même graphe</button>
+      <button id="s5zero">w1.grad = None, w2.grad = None</button>
+    </div>
+    <div class="stats" id="s5stats"></div>
+    <div class="tblwrap"><table class="pt" id="s5tbl"></table></div>
+    <div class="err" id="s5err"></div>
+    <div class="muted" id="s5note"></div>
+  </div>
+  <details class="codeblock" open data-code="52-58"><summary>Dans le code : <code>accumulated_w1_grad</code> <span class="muted">(<span class="cf"></span>)</span></summary><pre></pre><p class="map">La boucle <code>for</code> l.55-57 est ton clic sur « forward + backward » répété ; l.58 est la valeur de <code>w1.grad</code> affichée. Aucune remise à zéro dans la boucle : c'est exactement le piège. Chaque tour refait <code>forward</code> (l.56) parce qu'un <code>backward()</code> libère le graphe.</p></details>
+  <div class="tip"><b>À retenir :</b> après <code>n</code> appels sans remise à zéro, <code>.grad</code> vaut n fois le gradient d'un appel. Dans une boucle d'entraînement : forward, backward, mise à jour des poids, <b>puis</b> remise à zéro (<code>w1.grad = None</code> dans le code, <code>optimizer.zero_grad()</code> avec un optimiseur). Autre règle : <code>backward()</code> libère le graphe ; pour un deuxième backward il faut refaire la passe avant.</div>
+</section>
+
+<!-- 6 --------------------------------------------------------------- -->
+<section id="s6">
+  <h2><span class="n">6</span>Couper le graphe : no_grad et detach</h2>
+  <p>Tenir le carnet des opérations coûte de la mémoire et du temps, et parfois on ne veut pas de ce carnet. <code>torch.no_grad()</code> est un <b>interrupteur</b> : tant qu'il est actif, plus aucune fiche n'est écrite. <code>t.detach()</code> est une <b>photocopie sans historique</b> : même valeur, mais sans lien avec ce qui l'a produite. Dans les deux cas, le chemin que <code>backward()</code> pourrait remonter est coupé.</p>
+  <p><b>À toi :</b> coche et décoche les deux cases. Regarde quels tenseurs gardent un <code>grad_fn</code>, et ce que devient <code>backward()</code> : quels gradients arrivent, lesquels restent <code>None</code>, quand ça plante.</p>
+  <div class="card">
+    <div class="row">
+      <label class="chk"><input type="checkbox" id="s6ng"> <span>passe avant sous <code>with torch.no_grad():</code></span></label>
+      <label class="chk"><input type="checkbox" id="s6dt"> <span><code>h = h.detach()</code> avant <code>y_hat = w2 * h</code></span></label>
+    </div>
+    <div class="tblwrap"><table class="pt" id="s6tbl"></table></div>
+    <div id="s6res"></div>
+  </div>
+  <details class="codeblock" open data-code="81-83,104"><summary>Dans le code : <code>no_grad</code> et <code>detach</code> dans l'étape <span class="muted">(<span class="cf"></span>)</span></summary><pre></pre><p class="map">Dans le code de l'étape, <code>no_grad</code> ne sert qu'à la mise à jour (l.81) et <code>detach</code> est seulement inspecté (l.104). Les deux cases de cette page (passe avant sous <code>no_grad</code>, <code>detach</code> au milieu) sont des expériences en plus, exécutées par le script d'export, pas par <code>steps/</code>.</p></details>
+  <div class="tip"><b>À retenir :</b> un tenseur créé sous <code>no_grad</code> n'a pas de <code>grad_fn</code> (rien n'a été enregistré), et <code>backward()</code> dessus échoue. Un <code>detach()</code> au milieu du réseau laisse passer le gradient des branches non coupées (ici w2) et laisse <code>None</code> (et non 0) aux poids situés avant la coupure (ici w1).</div>
+</section>
+
+<!-- 7 --------------------------------------------------------------- -->
+<section id="s7">
+  <h2><span class="n">7</span>La boucle complète : descente de gradient</h2>
+  <p>On a maintenant toutes les pièces. Un tour de boucle : <b>forward</b> (calculer la loss), <b>backward</b> (remplir <code>.grad</code>), <b>mise à jour</b> <code>w -= lr * w.grad</code> (un pas dans le sens opposé à la pente, de taille <code>lr</code>), <b>remise à zéro</b> de <code>.grad</code>. La mise à jour se fait <b>sous <code>no_grad</code></b> : c'est de la comptabilité, pas une opération du modèle, et elle ne doit pas entrer dans le graphe. La descente part des poids de l'entrée commune du haut de la page.</p>
+  <p><b>À toi :</b> lance 50 pas avec lr = 0,1. Puis casse la boucle de trois façons, une à la fois : un lr trop grand, la remise à zéro désactivée, la mise à jour hors <code>no_grad</code>. Épingle une courbe pour la comparer à la suivante. Changer un réglage remet la descente à zéro.</p>
+  <div class="card">
+    <div class="row"><span class="muted">lr :</span><span id="s7lrs"></span></div>
+    <div class="row">
+      <label class="chk"><input type="checkbox" id="s7zero" checked> <span>remise à zéro de <code>.grad</code> à chaque pas</span></label>
+      <label class="chk"><input type="checkbox" id="s7out"> <span>mise à jour <b>hors</b> <code>no_grad</code></span></label>
+    </div>
+    <div class="row">
+      <button id="s7p1">+1 pas</button><button id="s7p10">+10 pas</button><button id="s7p50" class="on">+50 pas</button>
+      <button id="s7pin">Épingler la courbe</button><button id="s7reset">Remettre à zéro</button>
+    </div>
+    <canvas class="cv" id="c7" width="640" height="300"></canvas>
+    <div class="stats" id="s7stats"></div>
+    <div id="s7msg"></div>
+    <div class="muted" id="s7check"></div>
+  </div>
+  <div class="card" id="s7rebind"></div>
+  <details class="codeblock" open data-code="74-87"><summary>Dans le code : <code>descend</code> <span class="muted">(<span class="cf"></span>)</span></summary><pre></pre><p class="map">Le <code>lr</code> est l'argument l.74. « Remise à zéro » cochée = l.84-85. « Hors <code>no_grad</code> » = enlever le <code>with</code> de la l.81. La courbe est la liste <code>losses</code> (l.86). La variante « sans remise à zéro » n'existe pas dans <code>steps/</code> : le script d'export la calcule.</p></details>
+  <div class="tip"><b>À retenir :</b> la mise à jour des poids sort du graphe (<code>no_grad</code>) et la remise à zéro est indispensable. Un <code>lr</code> plus grand n'est pas toujours plus rapide : au-delà d'un seuil la descente diverge. Ces trois réglages sont des choix du développeur, aucun n'est automatique.</div>
+</section>
+
+<!-- Bilan ------------------------------------------------------------>
+<section id="bilan">
+  <h2><span class="n">8</span>Bilan</h2>
+  <div class="two">
+    <div class="card"><h3>Ce que ça prouve</h3>
+      <p>Au point du rapport (x = 0,5 ; y = 1 ; w1 = 0,8 ; w2 = −0,4), le gradient d'autograd est identique à la formule à la main : dw1 = 0,394271 et dw2 = −0,875387, à 1e-9 près en float64. Ta prédiction (« ça devrait être la même chose ») était juste pour les gradients.</p>
+      <p>Deux backward sans remise à zéro donnent exactement le double (0,788543). La descente fait passer la loss de 1,3271 à 0,0004 en 50 pas avec lr = 0,1.</p>
+    </div>
+    <div class="card"><h3>Ce que ça ne prouve pas</h3>
+      <p>Un seul point (x, y) et une seule initialisation : rien sur un vrai jeu de données, des mini-lots, ni sur la généralisation. La concordance à 1e-9 est celle de ce réseau en float64 ; en float32 l'écart relatif est de l'ordre de 1e-8.</p>
+      <p>Le moteur de cette page est un jouet en JavaScript : il reproduit le comportement observé de PyTorch sur ce réseau, pas son implémentation (qui est en C++, avec des milliers d'opérateurs).</p>
+    </div>
+  </div>
+  <div class="card" id="pont">
+    <h3>Où ça reviendra dans les prochaines étapes</h3>
+    <div class="tblwrap"><table class="pt wrap">
+      <tr><th>Dans l'étape 1</th><th>Ce que ça devient ensuite</th><th>Vu sur cette page ?</th></tr>
+      <tr><td><code>w1.grad = None</code> après la mise à jour</td><td>Étape 2, optimiseur : <code>optimizer.zero_grad()</code>, même rôle et même place dans la boucle ; <code>optimizer.step()</code> fait la mise à jour sous <code>no_grad</code> à ta place.</td><td>Oui (sections 5 et 7)</td></tr>
+      <tr><td><code>torch.no_grad()</code></td><td>Boucle d'évaluation (étapes 2 et 3) : pas de graphe pendant l'évaluation, donc moins de mémoire et de temps.</td><td>Le mécanisme oui (section 6), l'usage en évaluation non</td></tr>
+      <tr><td><code>loss.item()</code> dans <code>descend</code> (l.86)</td><td>Quand on consigne la loss à chaque pas (étapes 2 et 3), on garde un nombre et pas le tenseur : le tenseur retiendrait le graphe de chaque pas.</td><td>Non</td></tr>
+      <tr><td>Un <code>forward</code> par tour</td><td>Même structure dans les boucles d'entraînement suivantes : le graphe est jetable, il est refait à chaque mini-lot.</td><td>Oui (section 5)</td></tr>
+      <tr><td><code>float64</code> et tolérance 1e-9</td><td>Les modèles suivants tournent en float32 : un écart de l'ordre de 1e-8 entre deux calculs est de l'arrondi, pas un bug.</td><td>Oui (section 4)</td></tr>
+    </table></div>
+  </div>
+  <div class="tip"><b>Limites et suite.</b> Ici une seule loss scalaire et deux poids : tout est lisible. Au palier 2 il y aura des couches, des mini-lots et un optimiseur ; <code>zero_grad()</code>, <code>no_grad</code> pour l'évaluation et la mise à jour des poids reviendront tels quels. Le quiz revient sur les points sensibles, dont ceux des trois questions du rapport.</div>
+</section>
+
+<section id="resume">
+  <h2><span class="n">9</span>Résumé en 10 lignes</h2>
+  <ol class="resume">
+    <li>La loss est le résultat d'une chaîne de cinq opérations : × w1, <code>tanh</code>, × w2, − y, carré. Elle vaut 0 quand la sortie atteint la cible.</li>
+    <li>Le gradient d'un poids est la pente de la loss par rapport à ce poids. Pente positive : il faut <b>diminuer</b> le poids, donc on soustrait <code>lr × gradient</code>.</li>
+    <li>Tâter la pente coûte une passe avant par poids ; la règle de la chaîne donne tous les gradients en une seule passe arrière.</li>
+    <li>On multiplie les dérivées locales depuis la loss jusqu'au poids : dw2 = d_y_hat × h ; dw1 = d_y_hat × w2 × (1 − h²) × x (0,394271 et −0,875387 au point du rapport).</li>
+    <li>Un facteur quasi nul (tanh saturée, 1 − h² ≈ 0) étouffe le gradient des poids situés avant lui, pas celui des poids situés après.</li>
+    <li>PyTorch écrit le graphe (<code>grad_fn</code>) pendant la passe avant ; <code>backward()</code> le relit à l'envers. Ce n'est pas une approximation : mêmes valeurs que le calcul à la main.</li>
+    <li><code>.grad</code> additionne à chaque <code>backward()</code> : n appels donnent n fois le gradient. On le vide après la mise à jour (<code>= None</code> ou <code>zero_grad()</code>).</li>
+    <li><code>backward()</code> libère le graphe : il faut refaire la passe avant à chaque tour.</li>
+    <li>Sous <code>no_grad</code>, aucune fiche n'est écrite et <code>backward()</code> échoue ; <code>detach</code> coupe un chemin et laisse <code>.grad = None</code> (pas 0) aux poids situés avant la coupure.</li>
+    <li>La boucle est forward, backward, mise à jour sous <code>no_grad</code>, remise à zéro. Un lr trop grand diverge (lr = 2,0) ; sans remise à zéro la loss oscille sans converger.</li>
+  </ol>
+</section>
+
+<section id="quiz">
+  <h2>Quiz : peux-tu expliquer l'étape 1 ?</h2>
+  <p class="muted">Dix questions sur les points les plus sensibles de l'étape 1, dont plusieurs pièges. Après validation, chaque proposition, juste ou fausse, est expliquée.</p>
+  <div class="card" id="quizBox"></div>
+</section>
+
+</main>
+
+<footer>
+  <div class="wrap">Page pédagogique autonome : aucun réseau, aucune dépendance. Les valeurs « PyTorch réel » viennent de <code>donnees/s01.js</code>, produit par <code>scripts/exporter_s01.py</code> qui appelle le code de <code>steps/s01_autograd.py</code> sans le modifier. Tout le reste est recalculé dans ta page par un mini-moteur d'autograd écrit pour l'occasion.</div>
+</footer>
+
+<script src="donnees/s01.js"></script>
+<script>
+(() => {
+  const $ = (s) => document.querySelector(s);
+  const D = window.S01 || null;
+  if (!D) $('#nodata').hidden = false;
+  const fr = (x, d) => !Number.isFinite(x) ? String(x) : (Object.is(+x.toFixed(d), -0) ? 0 : x).toFixed(d).replace('.', ',');
+  const sci = (x) => !Number.isFinite(x) ? String(x) : x === 0 ? '0' : x.toExponential(2).replace('.', ',').replace('e+', 'e');
+  const num = (x, d = 4) => (x !== 0 && Number.isFinite(x) && (Math.abs(x) < 1e-3 || Math.abs(x) >= 1e5)) ? sci(x) : fr(x, d);
+  const css = (name) => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+
+  /* ================= Mini-moteur d'autograd (jouet, reproduit le comportement observé) ================= */
+  const RT = {
+    leafInplace: 'RuntimeError: a leaf Variable that requires grad is being used in an in-place operation.',
+    noGradBackward: 'RuntimeError: element 0 of tensors does not require grad and does not have a grad_fn',
+    second: 'RuntimeError: Trying to backward through the graph a second time (or directly access saved tensors after they have already been freed).',
+  };
+  let gradEnabled = true;
+  const noGrad = (f) => { const p = gradEnabled; gradEnabled = false; try { return f(); } finally { gradEnabled = p; } };
+  class T {
+    constructor(data, req, fn, label) { this.data = data; this.req = req; this.fn = fn; this.label = label; this.grad = null; }
+    get isLeaf() { return !this.fn; }
+  }
+  const leaf = (data, label) => new T(data, true, null, label);
+  const cst = (data, label) => new T(data, false, null, label);
+  const detach = (t) => new T(t.data, false, null, t.label);
+  function op(name, data, inputs, back, label) {
+    const rec = gradEnabled && inputs.some((t) => t.req);
+    return new T(data, rec, rec ? { name, inputs, back, freed: false } : null, label);
+  }
+  const mul = (a, b, label) => op('MulBackward0', a.data * b.data, [a, b], (g) => [g * b.data, g * a.data], label);
+  const tanhT = (a, label) => { const d = Math.tanh(a.data); return op('TanhBackward0', d, [a], (g) => [g * (1 - d * d)], label); };
+  const subT = (a, b, label) => op('SubBackward0', a.data - b.data, [a, b], (g) => [g, -g], label);
+  const sqT = (a, label) => op('PowBackward0', a.data * a.data, [a], (g) => [g * 2 * a.data], label);
+
+  // Passe avant du réseau (même ordre d'opérations que forward() du code)
+  function fwd(w1, w2, x, y, detachH = false) {
+    const X = cst(x, 'x'), Y = cst(y, 'y');
+    const a = mul(w1, X, 'a');
+    let h = tanhT(a, 'h');
+    if (detachH) h = detach(h);
+    const yh = mul(w2, h, 'yh');
+    const e = subT(yh, Y, 'e');
+    const loss = sqT(e, 'loss');
+    return { a, h, yh, e, loss };
+  }
+  // loss.backward() : remonte le graphe, remplit .grad des feuilles par AccumulateGrad (+=). Renvoie la liste des événements.
+  function backward(loss) {
+    if (!loss.req) throw new Error(RT.noGradBackward);
+    if (loss.fn.freed) throw new Error(RT.second);
+    const order = [], seen = new Set();
+    (function visit(t) {
+      if (!t.fn || seen.has(t.fn)) return;
+      seen.add(t.fn); t.fn.inputs.forEach(visit); order.push(t);
+    })(loss);
+    order.reverse();
+    const gmap = new Map([[loss, 1]]), events = [];
+    for (const t of order) {
+      const g = gmap.get(t), outs = t.fn.back(g);
+      events.push({ kind: 'op', t, id: t.label, name: t.fn.name, g, outs });
+      t.fn.inputs.forEach((inp, i) => {
+        if (!inp.req) return;
+        if (inp.fn) gmap.set(inp, (gmap.get(inp) ?? 0) + outs[i]);
+        else { inp.grad = (inp.grad ?? 0) + outs[i]; events.push({ kind: 'acc', t: inp, id: 'AG-' + inp.label, name: 'AccumulateGrad', g: outs[i] }); }
+      });
+      t.fn.freed = true;
+    }
+    return events;
+  }
+  function isub(t, v) {   // t -= v, en place
+    if (gradEnabled && t.req && t.isLeaf) throw new Error(RT.leafInplace);
+    t.data -= v;
+  }
+
+  /* ================= État et formules en Python pur (miroir de manual_grads) ================= */
+  const DEF = { x: 0.5, y: 1, w1: 0.8, w2: -0.4 };
+  const state = { ...DEF, s2sel: 'w1', s2eps: -1, k3: 0, k4: 0 };
+  const plainOf = (s) => {
+    const a = s.w1 * s.x, h = Math.tanh(a), yh = s.w2 * h, e = yh - s.y;
+    return { a, h, yh, e, loss: e * e };
+  };
+  const manualOf = (s) => {
+    const { h, yh } = plainOf(s);
+    const dyh = 2 * (yh - s.y);
+    return { dyh, dw2: dyh * h, dw1: dyh * s.w2 * (1 - h * h) * s.x };
+  };
+  const atDefault = () => D && state.x === D.x && state.y === D.y && state.w1 === D.w1 && state.w2 === D.w2;
+
+  /* ================= Curseurs communs ================= */
+  const SL = [['x', -2, 2], ['y', -2, 2], ['w1', -3, 3], ['w2', -3, 3]];
+  $('#sliders').innerHTML = SL.map(([k, lo, hi]) => `<div class="sl"><b>${k}</b><input type="range" id="sl_${k}" min="${lo}" max="${hi}" step="0.05" aria-label="${k}"><output id="so_${k}"></output></div>`).join('');
+  function syncSliders() { SL.forEach(([k]) => { $('#sl_' + k).value = state[k]; $('#so_' + k).textContent = fr(state[k], 2); }); }
+  SL.forEach(([k]) => $('#sl_' + k).addEventListener('input', (e) => { state[k] = parseFloat(e.target.value); inputsChanged(); }));
+  const preset = (o) => () => { Object.assign(state, o); inputsChanged(); };
+  $('#pRapport').addEventListener('click', preset(DEF));
+  $('#pSature').addEventListener('click', preset({ x: 2, y: 1, w1: 3, w2: -0.4 }));
+  $('#pZero').addEventListener('click', preset({ x: 0.5, y: 1, w1: 0.8, w2: 2.65 }));
+
+  /* ================= Animation pas à pas générique ================= */
+  const timers = {};
+  function stopPlay(key) { if (timers[key]) { clearInterval(timers[key]); timers[key] = null; const b = $('#' + key + 'play'); if (b) b.textContent = 'Animer'; } }
+  function togglePlay(key, max) {
+    if (timers[key]) { stopPlay(key); return; }
+    if (state['k' + key.slice(1)] >= max) state['k' + key.slice(1)] = 0;
+    $('#' + key + 'play').textContent = 'Pause';
+    timers[key] = setInterval(() => {
+      const kk = 'k' + key.slice(1);
+      if (state[kk] >= max) { stopPlay(key); return; }
+      state[kk]++; $('#' + key + 'k').value = state[kk]; renderers[key]();
+    }, 700);
+  }
+
+  /* ================= Section 1 ================= */
+  function r1() {
+    const f = plainOf(state);
+    const cell = (lab, v, out) => `<div class="cell${out ? ' out' : ''}"><small>${lab}</small><b>${fr(v, 4)}</b></div>`;
+    const opc = (t) => `<div class="op-connector"><span class="opchip">${t}</span><span class="op-arrow">→</span></div>`;
+    $('#s1chain').innerHTML = cell('x (entrée)', state.x)
+      + opc('× w1 (' + fr(state.w1, 2) + ')')
+      + cell('a', f.a)
+      + opc('tanh')
+      + cell('h', f.h)
+      + opc('× w2 (' + fr(state.w2, 2) + ')')
+      + cell('ŷ (sortie)', f.yh)
+      + opc('− y (' + fr(state.y, 2) + ')')
+      + cell('e (erreur)', f.e)
+      + opc('(·)²')
+      + cell('loss', f.loss, true);
+
+    const pCard = (num, role, formula, calc, res, isLoss = false) => `
+      <div class="poste-card${isLoss ? ' poste-loss' : ''}">
+        <div class="poste-header">
+          <span class="poste-num">${num}</span>
+          <span class="poste-role">${role}</span>
+        </div>
+        <div class="poste-formula"><code>${formula}</code></div>
+        <div class="poste-calc">${calc}</div>
+        <div class="poste-res"><b>${res}</b></div>
+      </div>
+    `;
+
+    const elPostes = $('#s1postes');
+    if (elPostes) {
+      elPostes.innerHTML =
+        pCard('Poste 1', 'Poids w1', 'a = x · w1', `${fr(state.x, 2)} × ${fr(state.w1, 2)}`, `= ${fr(f.a, 4)}`) +
+        pCard('Poste 2', 'Activation', 'h = tanh(a)', `tanh(${fr(f.a, 4)})`, `= ${fr(f.h, 4)}`) +
+        pCard('Poste 3', 'Poids w2', 'ŷ = w2 · h', `${fr(state.w2, 2)} × ${fr(f.h, 4)}`, `= ${fr(f.yh, 4)}`) +
+        pCard('Poste 4', 'Écart (erreur)', 'e = ŷ − y', `${fr(f.yh, 4)} − ${fr(state.y, 2)}`, `= ${fr(f.e, 4)}`) +
+        pCard('Poste 5', 'Perte (loss)', 'loss = e²', `(${fr(f.e, 4)})²`, `= ${fr(f.loss, 4)}`, true);
+    }
+
+    const lossEl = $('#s1lossval');
+    if (lossEl) {
+      lossEl.textContent = fr(f.loss, 4);
+      lossEl.className = f.loss < 0.01 ? 'up' : '';
+    }
+
+    const verdictEl = $('#s1verdict');
+    if (verdictEl) {
+      verdictEl.innerHTML = f.loss < 0.01
+        ? '<span class="up">✓ Objectif atteint : loss sous 0,01 !</span>'
+        : `<span class="muted">Objectif : loss &lt; 0,01 (écart restant : +${fr(f.loss - 0.01, 4)}).</span>`;
+    }
+
+    const statsEl = $('#s1stats');
+    if (statsEl) {
+      statsEl.innerHTML = `<div class="stat"><b>${fr(f.loss, 4)}</b><span>loss</span></div>`;
+    }
+  }
+  $('#s1reveal').addEventListener('click', () => {
+    const h = Math.tanh(state.w1 * state.x);
+    const msg = $('#s1msg');
+    if (Math.abs(h) < 1e-6) { msg.textContent = 'tanh(w1 · x) est quasi nul : aucun w2 ne peut atteindre la cible. Change w1 ou x.'; return; }
+    const w2 = Math.round(state.y / h * 100) / 100;
+    if (Math.abs(w2) > 3) { msg.textContent = `Il faudrait w2 = ${fr(w2, 2)}, hors de la plage du curseur (±3). Change w1 ou y.`; return; }
+    msg.textContent = `On prend w2 = y / h = ${fr(state.y, 2)} / ${fr(h, 4)} ≈ ${fr(w2, 2)} : la sortie colle alors à la cible.`;
+    state.w2 = w2; inputsChanged(true);
+  });
+
+  /* ================= Section 2 ================= */
+  const W2 = { w: 640, h: 300, l: 44, r: 14, t: 14, b: 32 };
+  function r2() {
+    const sel = state.s2sel, eps = Math.pow(10, state.s2eps);
+    $('#s2epso').textContent = 'ε = ' + sci(eps);
+    $('#s2w1').classList.toggle('on', sel === 'w1'); $('#s2w2').classList.toggle('on', sel === 'w2');
+    const L = (v) => plainOf({ ...state, [sel]: v }).loss;
+    const w = state[sel], exact = manualOf(state)[sel === 'w1' ? 'dw1' : 'dw2'];
+    const secant = (L(w + eps) - L(w)) / eps;
+    $('#s2stats').innerHTML = `<div class="stat"><b>${fr(exact, 6)}</b><span>pente exacte (règle de la chaîne)</span></div>
+      <div class="stat"><b>${fr(secant, 6)}</b><span>pente mesurée avec ε</span></div>
+      <div class="stat"><b>${sci(Math.abs(secant - exact))}</b><span>écart</span></div>`;
+    $('#s2msg').innerHTML = Math.abs(exact) < 1e-6 ? `<p>Pente quasi nulle : au creux (ou au sommet) de la courbe, ou sur un plateau. La descente n'a plus de direction à suivre.</p>`
+      : exact > 0 ? `<p>Pente <b>positive</b> : augmenter ${sel} fait monter la loss. Pour la réduire, il faut <b>diminuer</b> ${sel}.</p>`
+      : `<p>Pente <b>négative</b> : augmenter ${sel} fait descendre la loss. Pour la réduire, il faut <b>augmenter</b> ${sel}.</p>`;
+    drawS2(L, w, exact, secant, eps);
+  }
+  function drawS2(L, w, exact, secant, eps) {
+    const cv = $('#c2'), g = cv.getContext('2d'), { w: W, h: H, l, r, t, b } = W2;
+    const xs = [], N = 240; let ymax = 1.5;
+    for (let i = 0; i <= N; i++) { const v = -3 + 6 * i / N; const y = L(v); xs.push([v, y]); ymax = Math.max(ymax, Math.min(y, 10)); }
+    const X = (v) => l + (v + 3) / 6 * (W - l - r), Y = (v) => H - b - (v / ymax) * (H - t - b);
+    g.clearRect(0, 0, W, H);
+    g.fillStyle = css('--surface'); g.fillRect(0, 0, W, H);
+    g.strokeStyle = css('--line'); g.fillStyle = css('--muted'); g.font = '11px ui-monospace, Menlo, monospace'; g.lineWidth = 1;
+    for (let v = -3; v <= 3; v++) { g.beginPath(); g.moveTo(X(v), t); g.lineTo(X(v), H - b); g.stroke(); g.textAlign = 'center'; g.fillText(String(v), X(v), H - b + 14); }
+    for (let v = 0; v <= ymax; v += (ymax > 6 ? 2 : 1)) { g.beginPath(); g.moveTo(l, Y(v)); g.lineTo(W - r, Y(v)); g.stroke(); g.textAlign = 'right'; g.fillText(String(v), l - 6, Y(v) + 4); }
+    g.textAlign = 'center'; g.fillText(state.s2sel + '  (les autres paramètres sont fixes)', (l + W - r) / 2, H - 4);
+    g.save(); g.beginPath(); g.rect(l, t, W - l - r, H - t - b); g.clip();
+    g.strokeStyle = css('--text'); g.lineWidth = 2; g.beginPath();
+    xs.forEach(([v, y], i) => (i ? g.lineTo(X(v), Y(y)) : g.moveTo(X(v), Y(y)))); g.stroke();
+    const y0 = L(w), span = 1.0;
+    const line = (slope, color, dash) => { g.strokeStyle = color; g.lineWidth = 2.5; g.setLineDash(dash); g.beginPath(); g.moveTo(X(w - span), Y(y0 - slope * span)); g.lineTo(X(w + span), Y(y0 + slope * span)); g.stroke(); g.setLineDash([]); };
+    line(exact, css('--accent'), []);
+    line(secant, css('--hl'), [7, 5]);
+    g.fillStyle = css('--accent'); g.beginPath(); g.arc(X(w), Y(y0), 5, 0, 7); g.fill();
+    g.fillStyle = css('--hl'); g.beginPath(); g.arc(X(w + eps), Y(L(w + eps)), 4, 0, 7); g.fill();
+    g.restore();
+  }
+  $('#s2w1').addEventListener('click', () => { state.s2sel = 'w1'; r2(); });
+  $('#s2w2').addEventListener('click', () => { state.s2sel = 'w2'; r2(); });
+  $('#s2eps').addEventListener('input', (e) => { state.s2eps = parseFloat(e.target.value); r2(); });
+
+  /* ================= Section 3 ================= */
+  function chainRows() {
+    const f = plainOf(state), { dyh } = manualOf(state), h = f.h, w2 = state.w2;
+    // from = index de la ligne dont on part ; loc = dérivée locale numérique ; val = from.val * loc
+    const rows = [
+      { n: 'loss', rule: 'point de départ : d(loss)/d(loss) = 1', val: 1, loc: null, from: -1, code: '' },
+      { n: 'e', rule: 'd(e²)/de = 2·e', loc: 2 * f.e, from: 0, code: '2 * (y_hat - y)' },
+      { n: 'y_hat', rule: 'd(ŷ − y)/dŷ = 1', loc: 1, from: 1, code: 'd_y_hat = 2 * (y_hat - y)' },
+      { n: 'w2', rule: 'dŷ/dw2 = h', loc: h, from: 2, code: 'dw2 = d_y_hat * h', leaf: true },
+      { n: 'h', rule: 'dŷ/dh = w2', loc: w2, from: 2, code: 'd_y_hat * w2' },
+      { n: 'a', rule: 'dh/da = 1 − h²', loc: 1 - h * h, from: 4, code: 'd_y_hat * w2 * (1 - h**2)' },
+      { n: 'w1', rule: 'da/dw1 = x', loc: state.x, from: 5, code: 'dw1 = d_y_hat * w2 * (1 - h**2) * x', leaf: true },
+    ];
+    rows.forEach((r, i) => { if (i) r.val = rows[r.from].val * r.loc; });
+    rows[1].val = dyh;   // 1 × 2e : identique, on force la valeur exacte du code
+    return rows;
+  }
+  function r3() {
+    const rows = chainRows(), k = state.k3;
+    $('#s3k').value = k;
+    $('#s3tbl').innerHTML = '<tr><th>Remonter jusqu\'à</th><th>Dérivée locale utilisée</th><th>Calcul (précédent × local)</th><th>d(loss) / d(·)</th></tr>'
+      + rows.map((r, i) => {
+        const prev = r.from >= 0 ? rows[r.from] : null;
+        const calc = prev ? `${fr(prev.val, 4)} × ${fr(r.loc, 4)}` : '1';
+        return `<tr class="${i >= k ? 'dim' : ''}${i === k - 1 ? ' cur' : ''}"><td><b>${r.n}</b>${r.leaf ? ' (poids)' : ''}</td><td>${r.rule}</td><td class="num">${calc}</td><td class="num"><b>${fr(r.val, r.leaf ? 6 : 4)}</b></td></tr>`;
+      }).join('');
+    const shown = rows[k - 1];
+    $('#s3code').textContent = k === 0 ? 'Avance le curseur pour remonter la chaîne depuis la loss.'
+      : (shown.code ? 'code : ' + shown.code : 'code : on part de d_loss = 1') + (shown.n === 'y_hat' ? '   # les lignes e et y_hat sont fusionnées' : '');
+    const m = manualOf(state);
+    $('#s3stats').innerHTML = `<div class="stat"><b>${k >= 7 ? fr(m.dw1, 6) : '?'}</b><span>dw1 (manual_grads)</span></div><div class="stat"><b>${k >= 4 ? fr(m.dw2, 6) : '?'}</b><span>dw2 (manual_grads)</span></div>`;
+  }
+  $('#s3k').addEventListener('input', (e) => { stopPlay('s3'); state.k3 = +e.target.value; r3(); });
+  $('#s3play').addEventListener('click', () => togglePlay('s3', 7));
+  $('#s3all').addEventListener('click', () => { stopPlay('s3'); state.k3 = 7; r3(); });
+
+  /* ================= Section 4 ================= */
+  const NODES = {
+    a: [170, 112, 'MulBackward0', 'a = w1 · x'], h: [330, 112, 'TanhBackward0', 'h = tanh(a)'], yh: [490, 112, 'MulBackward0', 'y_hat = w2 · h'],
+    e: [650, 112, 'SubBackward0', 'e = y_hat − y'], loss: [810, 112, 'PowBackward0', 'loss = e²'],
+    'AG-w1': [170, 226, 'AccumulateGrad', 'w1.grad'], 'AG-w2': [490, 226, 'AccumulateGrad', 'w2.grad'],
+  };
+  const LOCAL = { loss: 'd(e²)/de = 2·e', e: 'd(ŷ − y)/dŷ = 1', yh: 'dŷ/dw2 = h et dŷ/dh = w2', h: 'dh/da = 1 − h²', a: 'da/dw1 = x' };
+  function run4() {
+    const w1 = leaf(state.w1, 'w1'), w2 = leaf(state.w2, 'w2');
+    const f = fwd(w1, w2, state.x, state.y);
+    const events = backward(f.loss);
+    return { w1, w2, f, events };
+  }
+  function r4() {
+    const { w1, w2, f, events } = run4(), k = state.k4;
+    $('#s4k').value = k;
+    const W = 132, Hh = 50;
+    const done = new Map(events.slice(0, k).map((ev) => [ev.id, ev]));
+    const act = k ? events[k - 1].id : null;
+    const val = { a: f.a.data, h: f.h.data, yh: f.yh.data, e: f.e.data, loss: f.loss.data };
+    let s = '<defs><marker id="ah" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="8" markerHeight="8" orient="auto"><path class="ah" d="M0,0 L8,4 L0,8 z"/></marker></defs>';
+    const edge = (x1, y1, x2, y2, dash) => `<path class="edge${dash ? ' dash' : ''}" d="M${x1},${y1} L${x2},${y2}" marker-end="url(#ah)"/>`;
+    const pill = (cx, cy, txt, leafy, w = 64) => `<g class="pill${leafy ? ' leaf' : ''}"><rect x="${cx - w / 2}" y="${cy - 14}" width="${w}" height="28" rx="14"/><text class="sub" x="${cx}" y="${cy + 4}" text-anchor="middle">${txt}</text></g>`;
+    // arêtes de la passe avant (gauche vers droite)
+    const ids = ['a', 'h', 'yh', 'e', 'loss'];
+    s += edge(87, 112, 170 - W / 2, 112);
+    ids.slice(0, -1).forEach((id, i) => { s += edge(NODES[id][0] + W / 2, 112, NODES[ids[i + 1]][0] - W / 2, 112); });
+    s += edge(170, 66, 170, 112 - Hh / 2) + edge(490, 66, 490, 112 - Hh / 2) + edge(650, 66, 650, 112 - Hh / 2);
+    s += edge(170, 112 + Hh / 2, 170, 226 - Hh / 2, true) + edge(490, 112 + Hh / 2, 490, 226 - Hh / 2, true);
+    s += pill(55, 112, 'w1 ' + fr(w1.data, 2), true, 74) + pill(170, 50, 'x ' + fr(state.x, 2), false) + pill(490, 50, 'w2 ' + fr(w2.data, 2), true, 74) + pill(650, 50, 'y ' + fr(state.y, 2), false);
+    // nœuds
+    Object.entries(NODES).forEach(([id, [cx, cy, ttl, sub]]) => {
+      const ev = done.get(id), cls = 'gn' + (ev ? ' done' : '') + (id === act ? ' act' : '');
+      const tx = cx + (id === 'a' || id === 'yh' ? 48 : 0);   // décalé pour ne pas croiser la flèche vers AccumulateGrad
+      const below = ids.includes(id) ? `<text class="val" x="${tx}" y="${cy + Hh / 2 + 14}" text-anchor="middle">valeur ${fr(val[id], 4)}</text>` : '';
+      const gv = ev ? `<text class="gv" x="${tx}" y="${cy + Hh / 2 + (ids.includes(id) ? 27 : 14)}" text-anchor="middle">${id.startsWith('AG') ? '.grad' : 'g'} = ${fr(ev.g, 6)}</text>` : '';
+      s += `<g class="${cls}"><rect class="box" x="${cx - W / 2}" y="${cy - Hh / 2}" width="${W}" height="${Hh}" rx="9"/><text class="ttl" x="${cx}" y="${cy - 4}" text-anchor="middle">${ttl}</text><text class="sub" x="${cx}" y="${cy + 14}" text-anchor="middle">${sub}</text></g>${below}${gv}`;
+    });
+    s += '<text class="lg" x="10" y="292">Passe avant : de gauche à droite.  backward() : de droite à gauche.  Contour violet : feuille qui requiert un gradient.  Tirets : lien vers AccumulateGrad.</text>';
+    $('#s4svg').innerHTML = s;
+    // légende de l'événement courant
+    const ev = k ? events[k - 1] : null;
+    if (!ev) $('#s4msg').textContent = 'Étape 0 : la passe avant est faite, le graphe existe, rien n\'a encore été remonté. Avance pour appeler backward().';
+    else if (ev.kind === 'acc') $('#s4msg').innerHTML = `<b>AccumulateGrad (${ev.t.label})</b> reçoit g = ${fr(ev.g, 6)} et fait <code>${ev.t.label}.grad += g</code> (c'est la source de l'accumulation de la section 5).`;
+    else {
+      const gives = ev.t.fn.inputs.map((inp, i) => [inp, ev.outs[i]]).filter(([inp]) => inp.req).map(([inp, v]) => `${inp.label} : ${fr(v, 6)}`).join(' ; ');
+      $('#s4msg').innerHTML = `<b>${ev.name}</b> reçoit g = ${fr(ev.g, 6)}. Dérivée locale : ${LOCAL[ev.id]}. Il transmet à : ${gives}.`;
+    }
+    // propriétés des tenseurs
+    const row = (t, lab) => `<tr><td><b>${lab}</b></td><td>${t.req}</td><td>${t.isLeaf}</td><td><code>${t.fn ? t.fn.name : 'None'}</code></td></tr>`;
+    $('#s4props').innerHTML = '<tr><th>tenseur</th><th>requires_grad</th><th>is_leaf</th><th>grad_fn</th></tr>'
+      + row(w1, 'w1') + row(w2, 'w2') + row(f.a, 'a') + row(f.h, 'h') + row(f.yh, 'y_hat') + row(f.e, 'e') + row(f.loss, 'loss');
+    // comparaison
+    const m = manualOf(state), ok = atDefault();
+    const rel = (u, v) => Math.abs(u - v) / Math.max(Math.abs(v), 1e-300);
+    const cellsRow = (lab, hand, auto, real, f32) => `<tr><td><b>${lab}</b></td><td class="num">${fr(hand, 6)}</td><td class="num">${fr(auto, 6)}</td><td class="num">${real === null ? 'n.d.' : fr(real, 6)}</td></tr>`;
+    $('#s4cmp').innerHTML = '<tr><th></th><th>à la main</th><th>autograd (page)</th><th>PyTorch réel</th></tr>'
+      + cellsRow('dw1', m.dw1, w1.grad, ok ? D.autograd[0] : null) + cellsRow('dw2', m.dw2, w2.grad, ok ? D.autograd[1] : null);
+    const diff = Math.max(rel(w1.grad, m.dw1), rel(w2.grad, m.dw2));
+    let note = `Écart relatif entre « à la main » et « autograd (page) » : ${sci(diff)}.`;
+    if (ok) {
+      const d32 = Math.max(rel(D.float32[0], D.manual[0]), rel(D.float32[1], D.manual[1]));
+      note += ` PyTorch réel en float32 : dw1 = ${fr(D.float32[0], 9)}, soit un écart relatif de ${sci(d32)} avec la formule à la main (float64 : ${sci(Math.max(rel(D.autograd[0], D.manual[0]), rel(D.autograd[1], D.manual[1])))}). La tolérance des tests est 1e-9 : seul float64 passe.`;
+      note += ` Nœuds listés par <code>graph_nodes</code> (réel) : ${D.graphNodes.join(', ')} : deux <code>AccumulateGrad</code>, une par feuille.`;
+    } else note += ' (La colonne « PyTorch réel » n\'existe qu\'aux valeurs du rapport : clique « Valeurs du rapport ».)';
+    $('#s4note').innerHTML = note;
+  }
+  $('#s4k').addEventListener('input', (e) => { stopPlay('s4'); state.k4 = +e.target.value; r4(); });
+  $('#s4play').addEventListener('click', () => togglePlay('s4', 7));
+  $('#s4all').addEventListener('click', () => { stopPlay('s4'); state.k4 = 7; r4(); });
+
+  /* ================= Section 5 ================= */
+  let acc5;
+  const newAcc5 = () => ({ w1: leaf(state.w1, 'w1'), w2: leaf(state.w2, 'w2'), hist: [], last: null, err: '' });
+  function r5() {
+    const m = manualOf(state), A = acc5, n = A.hist.length;
+    const g1 = A.w1.grad, g2 = A.w2.grad;
+    $('#s5stats').innerHTML = `<div class="stat"><b>${g1 === null ? 'None' : fr(g1, 6)}</b><span>w1.grad</span></div><div class="stat"><b>${g2 === null ? 'None' : fr(g2, 6)}</b><span>w2.grad</span></div>
+      <div class="stat"><b>${g1 === null ? 'n.d.' : fr(g1 / m.dw1, 2) + ' ×'}</b><span>w1.grad ÷ gradient d'un seul appel (${fr(m.dw1, 6)})</span></div>`;
+    $('#s5tbl').innerHTML = '<tr><th>appel</th><th>événement</th><th>w1.grad après</th><th>multiple du gradient correct</th></tr>'
+      + (n ? A.hist.map((h, i) => `<tr><td class="num">${i + 1}</td><td>${h.ev}</td><td class="num">${h.g === null ? 'None' : fr(h.g, 6)}</td><td class="num">${h.g === null ? 'n.d.' : fr(h.g / m.dw1, 2) + ' ×'}</td></tr>`).join('')
+        : '<tr><td colspan="4" class="muted">Aucun appel pour l\'instant.</td></tr>');
+    $('#s5err').textContent = A.err;
+    const real = D && atDefault() ? ` Vrai PyTorch aux valeurs du rapport (<code>accumulated_w1_grad</code>) : 1 appel ${fr(D.accumulated[0], 6)}, 2 appels ${fr(D.accumulated[1], 6)}, 3 appels ${fr(D.accumulated[2], 6)}.` : '';
+    $('#s5note').innerHTML = 'Chaque clic sur « forward + backward » refait une passe avant : le graphe est libéré après un backward.' + real;
+  }
+  const pushHist = (ev) => { acc5.hist.push({ ev, g: acc5.w1.grad }); };
+  $('#s5go').addEventListener('click', () => {
+    const f = fwd(acc5.w1, acc5.w2, state.x, state.y);
+    backward(f.loss); acc5.last = f.loss; acc5.err = ''; pushHist('forward + backward()'); r5();
+  });
+  $('#s5again').addEventListener('click', () => {
+    if (!acc5.last) { acc5.err = 'Fais d\'abord un « forward + backward » : il n\'y a pas encore de graphe à rejouer.'; r5(); return; }
+    try { backward(acc5.last); } catch (e) { acc5.err = e.message; pushHist('backward() seul : échec, rien n\'est ajouté'); r5(); }
+  });
+  $('#s5zero').addEventListener('click', () => { acc5.w1.grad = null; acc5.w2.grad = null; acc5.err = ''; pushHist('remise à zéro'); r5(); });
+
+  /* ================= Section 6 ================= */
+  function r6() {
+    const useNg = $('#s6ng').checked, useDt = $('#s6dt').checked;
+    const w1 = leaf(state.w1, 'w1'), w2 = leaf(state.w2, 'w2');
+    const f = useNg ? noGrad(() => fwd(w1, w2, state.x, state.y, useDt)) : fwd(w1, w2, state.x, state.y, useDt);
+    const row = (t, lab) => `<tr><td><b>${lab}</b></td><td class="num">${fr(t.data, 4)}</td><td>${t.req}</td><td><code>${t.fn ? t.fn.name : 'None'}</code></td></tr>`;
+    $('#s6tbl').innerHTML = '<tr><th>tenseur</th><th>valeur</th><th>requires_grad</th><th>grad_fn</th></tr>'
+      + row(f.a, 'a') + row(f.h, useDt ? 'h (détaché)' : 'h') + row(f.yh, 'y_hat') + row(f.e, 'e') + row(f.loss, 'loss');
+    let html;
+    try {
+      backward(f.loss);
+      const show = (t, lab) => `<div class="stat"><b>${t.grad === null ? 'None' : fr(t.grad, 6)}</b><span>${lab}.grad</span></div>`;
+      html = `<p class="muted"><code>loss.backward()</code> réussit.</p><div class="stats">${show(w1, 'w1')}${show(w2, 'w2')}</div>`
+        + (w1.grad === null ? '<p>w1 est resté à <code>None</code> : aucun chemin du graphe ne mène de la loss à w1 (la coupure est entre les deux).</p>' : '');
+    } catch (e) { html = `<p class="muted"><code>loss.backward()</code> échoue :</p><div class="err">${e.message}</div>`; }
+    $('#s6res').innerHTML = html;
+  }
+  $('#s6ng').addEventListener('change', r6); $('#s6dt').addEventListener('change', r6);
+
+  /* ================= Section 7 ================= */
+  const LRS = ['0.01', '0.05', '0.1', '0.3', '0.5', '1.0', '2.0'];
+  const set7 = { lr: '0.1', pinned: null };
+  let S7;
+  const newS7 = () => ({ w1: leaf(state.w1, 'w1'), w2: leaf(state.w2, 'w2'), losses: [], err: '' });
+  $('#s7lrs').innerHTML = LRS.map((l) => `<button data-lr="${l}">${fr(+l, 2)}</button>`).join(' ');
+  function step7(n) {
+    const zero = $('#s7zero').checked, outside = $('#s7out').checked, lr = +set7.lr;
+    for (let i = 0; i < n && !S7.err && S7.losses.length < 200; i++) {
+      const f = fwd(S7.w1, S7.w2, state.x, state.y);
+      backward(f.loss);
+      try {
+        if (outside) { isub(S7.w1, lr * S7.w1.grad); isub(S7.w2, lr * S7.w2.grad); }
+        else noGrad(() => { isub(S7.w1, lr * S7.w1.grad); isub(S7.w2, lr * S7.w2.grad); });
+      } catch (e) { S7.err = e.message; break; }
+      if (zero) { S7.w1.grad = null; S7.w2.grad = null; }
+      S7.losses.push(f.loss.data);
+    }
+    r7();
+  }
+  const reset7 = () => { S7 = newS7(); r7(); };
+  function r7() {
+    document.querySelectorAll('#s7lrs button').forEach((b) => b.classList.toggle('on', b.dataset.lr === set7.lr));
+    const L = S7.losses, n = L.length;
+    $('#s7stats').innerHTML = `<div class="stat"><b>${n}</b><span>pas effectués</span></div>
+      <div class="stat"><b>${n ? num(L[0]) + ' → ' + num(L[n - 1]) : 'n.d.'}</b><span>loss (1er pas → dernier pas, comme dans le rapport)</span></div>
+      <div class="stat"><b>${fr(S7.w1.data, 4)} ; ${fr(S7.w2.data, 4)}</b><span>w1 ; w2 maintenant</span></div>`;
+    $('#s7msg').innerHTML = S7.err ? `<div class="warn"><p>La boucle s'arrête dès le premier pas. PyTorch répond :</p><div class="err">${S7.err}</div><p>Un poids est une feuille du graphe qui requiert un gradient : le modifier « en place » pendant que le graphe enregistre est interdit. D'où le <code>with torch.no_grad():</code>.</p></div>` : '';
+    // comparaison avec PyTorch réel
+    let chk = '';
+    if (D && atDefault() && n && !S7.err) {
+      const ref = $('#s7zero').checked ? D.descent[set7.lr] : D.descentNoZero[set7.lr].losses;
+      let mx = 0;
+      L.forEach((v, i) => { if (i < ref.length) mx = Math.max(mx, Math.abs(v - ref[i]) / (Math.max(Math.abs(v), Math.abs(ref[i])) + 1e-12)); });
+      chk = `Vérification contre PyTorch réel (mêmes valeurs que le rapport, ${$('#s7zero').checked ? 'fonction <code>descend</code> du code' : 'même boucle sans remise à zéro, calculée par le script'}) : écart maximal (relatif, avec un plancher de 1e-12) sur les ${Math.min(n, ref.length)} premiers pas = ${sci(mx)}.`;
+    } else if (n && !S7.err) chk = 'Pas de comparaison avec PyTorch réel : les valeurs de départ diffèrent de celles du rapport (clique « Valeurs du rapport »).';
+    const noZeroNote = n && !S7.err && !$('#s7zero').checked
+      ? '<p>Sans remise à zéro, <code>.grad</code> contient la somme de tous les gradients depuis le début, et c\'est cette somme que la mise à jour utilise. Aucune erreur, mais la courbe ne descend plus régulièrement : elle oscille sur plusieurs ordres de grandeur. Un creux de passage (loss basse au dernier pas) ne signifie pas que la descente a convergé : regarde toute la courbe, et compare avec la courbe épinglée.</p>' : '';
+    $('#s7check').innerHTML = noZeroNote + chk;
+    drawS7();
+    // variante sans erreur
+    const rb = D && D.rebind;
+    $('#s7rebind').innerHTML = rb ? `<h4>Variante qui ne plante pas, et qui est pire</h4><p>Écrire <code>w1 = w1 - lr * w1.grad</code> (sans « en place ») passe sans erreur, mais crée un <b>nouveau</b> tenseur : dans le vrai PyTorch, <code>is_leaf</code> vaut alors <code>${rb.isLeaf ? 'True' : 'False'}</code>, son <code>grad_fn</code> est <code>${rb.gradFn}</code> (il porte l'historique de la mise à jour), et après un nouveau <code>backward()</code> son <code>.grad</code> reste <code>${rb.gradAfterBackward === null ? 'None' : rb.gradAfterBackward}</code>. Le poids n'est plus une feuille qu'on entraîne.</p>` : '';
+  }
+  function drawS7() {
+    const cv = $('#c7'), g = cv.getContext('2d'), { w: W, h: H, l, r, t, b } = W2;
+    const series = [[S7.losses, css('--accent'), []]];
+    if (set7.pinned) series.unshift([set7.pinned.losses, css('--muted'), [6, 4]]);
+    const N = Math.max(50, ...series.map((s) => s[0].length));
+    const lo = -10, hi = 6, clampL = (v) => Math.log10(Math.max(v, 1e-10));
+    const X = (i) => l + (i / N) * (W - l - r), Y = (v) => H - b - ((Math.min(Math.max(clampL(v), lo), hi) - lo) / (hi - lo)) * (H - t - b);
+    g.clearRect(0, 0, W, H); g.fillStyle = css('--surface'); g.fillRect(0, 0, W, H);
+    g.strokeStyle = css('--line'); g.fillStyle = css('--muted'); g.font = '11px ui-monospace, Menlo, monospace'; g.lineWidth = 1;
+    for (let p = lo; p <= hi; p += 2) { const y = Y(Math.pow(10, p)); g.beginPath(); g.moveTo(l, y); g.lineTo(W - r, y); g.stroke(); g.textAlign = 'right'; g.fillText('1e' + p, l - 6, y + 4); }
+    for (let i = 0; i <= N; i += (N > 100 ? 50 : 10)) { g.textAlign = 'center'; g.fillText(String(i), X(i), H - b + 14); }
+    g.textAlign = 'center'; g.fillText('pas   (loss en échelle logarithmique, plancher 1e-10)', (l + W - r) / 2, H - 4);
+    g.save(); g.beginPath(); g.rect(l, t, W - l - r, H - t - b); g.clip();
+    series.forEach(([ls, color, dash]) => {
+      if (!ls.length) return;
+      g.strokeStyle = color; g.lineWidth = 2.5; g.setLineDash(dash); g.beginPath();
+      ls.forEach((v, i) => (i ? g.lineTo(X(i), Y(v)) : g.moveTo(X(i), Y(v)))); g.stroke(); g.setLineDash([]);
+    });
+    g.restore();
+    const leg = set7.pinned ? `gris pointillé : ${set7.pinned.label}` : '';
+    g.fillStyle = css('--muted'); g.textAlign = 'left'; g.fillText(leg, l + 8, t + 14);
+  }
+  const label7 = () => `lr = ${fr(+set7.lr, 2)}, ${$('#s7zero').checked ? 'avec' : 'sans'} remise à zéro`;
+  document.querySelectorAll('#s7lrs button').forEach((b) => b.addEventListener('click', () => { set7.lr = b.dataset.lr; reset7(); }));
+  $('#s7zero').addEventListener('change', reset7); $('#s7out').addEventListener('change', reset7);
+  $('#s7p1').addEventListener('click', () => step7(1)); $('#s7p10').addEventListener('click', () => step7(10)); $('#s7p50').addEventListener('click', () => step7(Math.max(1, 50 - S7.losses.length)));
+  $('#s7pin').addEventListener('click', () => { set7.pinned = { losses: S7.losses.slice(), label: label7() + ($('#s7out').checked ? ', hors no_grad' : '') }; r7(); });
+  $('#s7reset').addEventListener('click', reset7);
+
+  /* ================= Rafraîchissement ================= */
+  const renderers = { s3: r3, s4: r4 };
+  function inputsChanged(keepMsg) {
+    stopPlay('s3'); stopPlay('s4');
+    syncSliders(); acc5 = newAcc5(); S7 = newS7();
+    if (!keepMsg) $('#s1msg').textContent = '';
+    r1(); r2(); r3(); r4(); r5(); r6(); r7();
+  }
+  window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => { r2(); r7(); });
+
+  /* ================= Quiz ================= */
+  const QUIZ = [
+    { q: 'Au point de départ, dw1 > 0. Que faut-il faire de w1 pour faire baisser la loss ?', trap: true, ref: '#s2',
+      o: [
+        { t: 'Le diminuer : la pente est positive, on va dans le sens opposé', ok: true, why: 'Pente positive : la loss monte quand w1 monte. La mise à jour w1 − lr × dw1 soustrait bien le gradient.' },
+        { t: 'L\'augmenter : un gradient positif indique le bon sens à suivre', ok: false, why: 'Idée fausse classique : le gradient pointe vers la montée de la loss, pas vers la descente.' },
+        { t: 'Ne rien changer : un gradient positif signale un minimum atteint', ok: false, why: 'Un minimum a un gradient nul, pas positif. Ici dw1 = 0,394 : la loss peut encore baisser.' },
+        { t: 'Ça dépend de w2 : le signe de dw1 ne suffit pas à décider', ok: false, why: 'w2 joue sur la valeur de dw1, mais le signe de dw1 donne déjà le sens de descente de w1.' },
+      ] },
+
+    { q: 'Avec le préréglage « Tanh saturée » (x = 2, w1 = 3), la loss est grande (≈ 1,96) mais dw1 est quasi nul. Pourquoi ?', trap: true, ref: '#s3',
+      o: [
+        { t: 'Le facteur 1 − h² est quasi nul (h ≈ 1) et écrase le produit', ok: true, why: 'Ici a = 6 et 1 − h² ≈ 2,5e-5 : w1 n\'a presque plus d\'effet sur la sortie, donc dw1 s\'effondre.' },
+        { t: 'La loss est trop grande pour qu\'on puisse la dériver correctement', ok: false, why: 'Dériver n\'a pas de limite de taille, et dw2 vaut environ −2,8 dans la même situation.' },
+        { t: 'Le gradient de w2 est lui aussi nul, donc tout le réseau est bloqué', ok: false, why: 'Faux : dw2 = d_y_hat × h reste grand. Seul le chemin qui passe par tanh est étouffé.' },
+        { t: 'Dès que w1 dépasse 1, le gradient de w1 est automatiquement coupé', ok: false, why: 'Aucun seuil de ce type : c\'est la valeur de a = w1 × x, donc de h, qui compte.' },
+      ] },
+
+    { q: 'Avec d_y_hat = −2,3040 ; w2 = −0,4 ; 1 − h² = 0,8556 ; x = 0,5, quelle est la valeur de dw1 ?', ref: '#s3',
+      o: [
+        { t: '0,3943', ok: true, why: '(−2,3040) × (−0,4) × 0,8556 × 0,5 = 0,3943, soit le dw1 du rapport.' },
+        { t: '0,4608', ok: false, why: 'Facteur 1 − h² oublié : 0,9216 × 0,5. Le passage dans tanh compte.' },
+        { t: '0,0665', ok: false, why: 'h² = 0,1444 pris à la place de 1 − h². La dérivée de tanh est 1 − tanh².' },
+        { t: '−0,9857', ok: false, why: 'Facteur w2 oublié : c\'est la dérivée locale qui mène de y_hat à h.' },
+      ] },
+
+    { q: 'À quel moment le graphe de calcul est-il construit ?', trap: true, ref: '#s4',
+      o: [
+        { t: 'Pendant la passe avant, à chaque opération sur un tenseur suivi', ok: true, why: 'Chaque opération note son nœud en s\'exécutant. backward() ne fait que relire ces notes.' },
+        { t: 'Pendant loss.backward(), qui analyse la formule complète du réseau', ok: false, why: 'backward() ne connaît pas la formule : sans nœuds déjà écrits, il échoue (section 6).' },
+        { t: 'À la création de w1 et w2, une fois pour toutes avant la boucle', ok: false, why: 'À ce moment w1 et w2 sont de simples feuilles. Un graphe neuf est écrit à chaque passe avant.' },
+        { t: 'Pendant la mise à jour des poids, qui relie les paramètres à la loss', ok: false, why: 'La mise à jour se fait sous no_grad justement pour ne rien enregistrer.' },
+      ] },
+
+    { q: 'On fait 3 fois forward + backward() sans remise à zéro (dw1 = 0,3943 pour un appel). Que vaut <code>w1.grad</code> ?', ref: '#s5',
+      o: [
+        { t: '1,1828', ok: true, why: 'Chaque backward() ajoute 0,3943 : 3 × 0,3943. Le vrai PyTorch donne 1,182814.' },
+        { t: '0,3943', ok: false, why: 'Idée fausse « le dernier écrase le précédent » : PyTorch fait +=, pas =.' },
+        { t: '0,7885', ok: false, why: 'C\'est le résultat après deux appels, pas trois.' },
+        { t: '1,5771', ok: false, why: 'C\'est le résultat après quatre appels : un de trop.' },
+      ] },
+
+    { q: 'Où place-t-on la remise à zéro de <code>.grad</code> dans la boucle d\'entraînement ?', trap: true, ref: '#s5',
+      o: [
+        { t: 'Après la mise à jour des poids, avant le backward() suivant', ok: true, why: 'C\'est la place dans l\'étape 1 (w1.grad = None). Avec un optimiseur : optimizer.zero_grad().' },
+        { t: 'Entre backward() et la mise à jour des poids, pour partir propre', ok: false, why: 'La mise à jour lit .grad : le vider avant donne un pas nul, ou une erreur sur None.' },
+        { t: 'Une seule fois, avant la première itération de la boucle', ok: false, why: 'Dès le 2e tour, .grad contient la somme des gradients passés (section 7).' },
+        { t: 'Jamais : PyTorch la fait à chaque nouvelle passe avant', ok: false, why: 'Non : une nouvelle passe avant crée un graphe mais ne touche pas aux .grad des feuilles.' },
+      ] },
+
+    { q: 'Sous <code>torch.no_grad()</code>, on calcule h, y_hat et loss à partir de w1 et w2. Lesquelles de ces affirmations sont vraies ?', multi: true, ref: '#s6',
+      o: [
+        { t: 'loss.grad_fn vaut None : aucune opération n\'a été enregistrée', ok: true, why: 'no_grad coupe l\'enregistrement : aucune fiche n\'est écrite, donc aucun nœud n\'existe.' },
+        { t: 'loss.backward() échoue : il n\'y a aucun graphe à remonter', ok: true, why: 'C\'est l\'erreur réelle montrée en section 6 : aucun tenseur ne requiert de gradient.' },
+        { t: 'w1 et w2 sont supprimés du réseau pendant le bloc no_grad', ok: false, why: 'Les poids gardent valeur et requires_grad=True : seul l\'enregistrement est suspendu.' },
+        { t: 'Les .grad de w1 et w2 sont remis à zéro en entrant dans le bloc', ok: false, why: 'no_grad ne touche pas aux .grad : il n\'y a simplement rien à remonter.' },
+      ] },
+
+    { q: 'On remplace <code>h</code> par <code>h.detach()</code> dans la passe avant, puis <code>loss.backward()</code>. Que valent w1.grad et w2.grad (valeurs du rapport) ?', trap: true, ref: '#s6',
+      o: [
+        { t: 'w1.grad = None ; w2.grad = −0,875387, inchangé', ok: true, why: 'detach coupe le chemin vers w1. Le chemin vers w2, placé après h, reste intact.' },
+        { t: 'w1.grad = 0 ; w2.grad = −0,875387, inchangé', ok: false, why: 'Piège : 0 veut dire « calculé et nul », None veut dire « aucun chemin n\'y mène ».' },
+        { t: 'Les deux valent None : plus aucun gradient n\'est calculé', ok: false, why: 'w2 est branché après le point de coupure : sa branche du graphe est intacte.' },
+        { t: 'backward() lève une erreur, car h n\'a plus de grad_fn', ok: false, why: 'La loss requiert encore un gradient via w2 : backward() fonctionne.' },
+      ] },
+
+    { q: 'Pourquoi la mise à jour <code>w1 -= lr * w1.grad</code> se fait-elle sous <code>torch.no_grad()</code> ?', ref: '#s7',
+      o: [
+        { t: 'Elle ne doit pas être enregistrée, et modifier une feuille en place est refusé', ok: true, why: 'Hors no_grad, la page donne la vraie erreur : « a leaf Variable that requires grad is being used in an in-place operation ».' },
+        { t: 'Parce que no_grad accélère la descente : la loss converge en bien moins de pas', ok: false, why: 'Il évite d\'enregistrer des nœuds inutiles, mais ne change pas la trajectoire des poids.' },
+        { t: 'Parce que sans lui le gradient serait remis à zéro au lieu du poids mis à jour', ok: false, why: 'Rien de tel : la remise à zéro est une instruction explicite (w1.grad = None).' },
+        { t: 'Parce que les poids doivent perdre leur requires_grad le temps de la mise à jour', ok: false, why: 'Ils gardent requires_grad=True ; no_grad suspend seulement l\'enregistrement.' },
+      ] },
+
+    { q: 'On désactive la remise à zéro de <code>.grad</code> dans la descente (lr = 0,1, valeurs du rapport). Que montre la page ?', trap: true, ref: '#s7',
+      o: [
+        { t: 'Aucune erreur, mais le pas cumule les gradients et la loss oscille', ok: true, why: 'La loss oscille entre ≈ 0,003 et 1,3 ; le 0,0236 du pas 50 n\'est qu\'un creux de passage.' },
+        { t: 'Rien ne change : PyTorch remet .grad à zéro à chaque nouvelle passe avant', ok: false, why: 'Les courbes diffèrent nettement : avec remise à zéro, la loss atteint 0,0004.' },
+        { t: 'La descente plante avec une erreur dès le deuxième tour de boucle', ok: false, why: 'Aucune erreur : le bug est silencieux, c\'est ce qui le rend dangereux.' },
+        { t: 'La descente converge plus vite, puisque les gradients s\'additionnent', ok: false, why: 'La loss remonte de 0,01 à 0,71 entre les pas 10 et 12 : cumuler déforme, n\'accélère pas.' },
+      ] },
+  ];
+  // La bonne réponse est écrite en premier ci-dessus : on tourne les propositions (ordre fixe, reproductible) pour varier sa position.
+  QUIZ.forEach((x, qi) => { const k = (qi * 3 + 1) % x.o.length; x.o = x.o.slice(k).concat(x.o.slice(0, k)); });
+  const quizState = QUIZ.map(() => null);
+  const quizBox = $('#quizBox');
+  const hintOf = (x) => (x.multi ? 'Coche toutes les bonnes réponses.' : 'Une seule bonne réponse.');
+  function renderQuiz() {
+    quizBox.innerHTML = '<div class="quiz-head"><span class="score" id="qscore"></span><button id="qreset">↺ Recommencer le quiz</button></div>'
+      + QUIZ.map((x, qi) => `<div class="q" data-q="${qi}">
+        <p class="qt"><span class="tag ${x.trap ? 'trap' : ''}">${x.trap ? 'Piège' : 'Question ' + (qi + 1)}</span>${x.multi ? '<span class="tag multi">Plusieurs réponses</span>' : ''}${x.q}</p>
+        <p class="hint">${hintOf(x)}</p>
+        ${x.o.map((o, oi) => `<label class="opt" data-o="${oi}"><input type="${x.multi ? 'checkbox' : 'radio'}" name="q${qi}"><span class="ot">${o.t}<span class="why">${o.ok ? '✓ Vrai. ' : '✗ Faux. '}${o.why}</span></span></label>`).join('')}
+        <div class="row"><button class="check on">Valider</button></div>
+        <div class="explain"><p class="res"></p>${x.ref ? `<p class="muted">À relire : <a href="${x.ref}">${x.ref}</a></p>` : ''}</div>
+      </div>`).join('');
+    updateScore();
+  }
+  function updateScore() {
+    const done = quizState.filter(Boolean), right = done.filter((r) => r.right).length;
+    $('#qscore').textContent = `Score : ${right} / ${QUIZ.length}` + (done.length < QUIZ.length ? ` (${done.length} répondue${done.length > 1 ? 's' : ''})` : ' : terminé');
+  }
+  quizBox.addEventListener('click', (e) => {
+    if (e.target.id === 'qreset') { quizState.fill(null); renderQuiz(); return; }
+    const btn = e.target.closest('button.check'); if (!btn) return;
+    const box = btn.closest('.q'), qi = +box.dataset.q, x = QUIZ[qi];
+    if (quizState[qi]) return;
+    const picked = [...box.querySelectorAll('.opt')].map((l) => l.querySelector('input').checked);
+    if (!picked.some(Boolean)) { box.querySelector('.hint').textContent = 'Choisis au moins une réponse.'; return; }
+    box.querySelector('.hint').textContent = hintOf(x);
+    let nbOk = 0, nbBad = 0;
+    box.querySelectorAll('.opt').forEach((l, oi) => {
+      const ok = x.o[oi].ok, sel = picked[oi];
+      l.classList.add(ok && sel ? 'good' : !ok && sel ? 'wrong' : ok ? 'miss' : 'neutral');
+      if (ok && sel) nbOk++;
+      if (!ok && sel) nbBad++;
+      l.querySelector('input').disabled = true;
+    });
+    const total = x.o.filter((o) => o.ok).length, right = nbOk === total && nbBad === 0;
+    quizState[qi] = { right };
+    const res = box.querySelector('.res');
+    res.className = 'res ' + (right ? 'ok' : nbOk > 0 && nbBad === 0 ? 'part' : 'ko');
+    res.textContent = right ? 'Correct.' : nbOk > 0 && nbBad === 0 ? `Incomplet : tu as trouvé ${nbOk} bonne(s) réponse(s) sur ${total}.` : 'Pas tout à fait.';
+    box.classList.add('done'); btn.disabled = true;
+    updateScore();
+  });
+  renderQuiz();
+
+  /* ================= Extraits de code (lus dans steps/s01_autograd.py via donnees/s01.js) ================= */
+  (() => {
+    const src = D && D.source;
+    const esc = (t) => t.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    document.querySelectorAll('.codeblock[data-code]').forEach((d) => {
+      if (!src) { d.hidden = true; return; }
+      const parts = d.dataset.code.split(',').map((r) => r.split('-').map(Number));
+      let html = '';
+      parts.forEach(([a, b], i) => {
+        if (i) html += '<span class="gap">⋮</span>\n';
+        for (let n = a; n <= (b || a); n++) html += `<span class="ln">${n}</span>${esc(src.lines[n - 1])}\n`;
+      });
+      d.querySelector('pre').innerHTML = html.replace(/\n$/, '');
+      d.querySelector('.cf').textContent = `${src.file}, l.${d.dataset.code.replace(/,/g, ' et ')}`;
+    });
+  })();
+
+  /* ================= Démarrage ================= */
+  inputsChanged();
+})();
+</script>
+</body>
+</html>
