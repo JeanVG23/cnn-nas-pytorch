@@ -124,6 +124,16 @@ table.pt tr.cur td { background: color-mix(in srgb, var(--hl) 16%, var(--surface
 .formula { font: 13px/1.7 ui-monospace, Menlo, monospace; background: var(--surface2); border-radius: 8px; padding: 8px 12px; margin: 6px 0; overflow-x: auto; white-space: pre; }
 .pt.wrap td, .pt.wrap th { white-space: normal; vertical-align: top; text-align: left; }
 .pt.wrap td:nth-child(2) { min-width: 240px; }
+.predict { border: 2px solid var(--hl); border-radius: 10px; background: var(--surface); padding: 12px 14px; margin: 12px 0; }
+.predict h4 { margin: 0 0 6px; }
+.predict > p { max-width: 74ch; }
+.predict .tip { margin-bottom: 0; }
+.locked { opacity: .35; filter: grayscale(.5); pointer-events: none; }
+.porte-q { margin: 14px 0; }
+.porte-q textarea { width: 100%; min-height: 96px; font: inherit; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); color: var(--text); resize: vertical; }
+.porte-q .pts { margin-top: 8px; }
+.porte-q .pts label { display: flex; gap: 8px; align-items: flex-start; margin: 6px 0; cursor: pointer; }
+.porte-q .pts input { margin-top: 5px; accent-color: var(--accent); flex: 0 0 auto; }
 .resume { max-width: 74ch; padding-left: 1.4em; }
 .resume li { margin: 6px 0; }
 .codeblock { margin: 12px 0; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); }
@@ -242,6 +252,7 @@ footer { padding: 36px 0 60px; color: var(--muted); font-size: .85rem; }
     <a href="#s7">7. Descente</a>
     <a href="#bilan">Bilan</a>
 <a href="#resume">Résumé</a>
+<a href="#porte">Explique</a>
     <a href="#quiz">Quiz</a>
   </div>
 </nav>
@@ -452,6 +463,12 @@ footer { padding: 36px 0 60px; color: var(--muted); font-size: .85rem; }
     <li>Sous <code>no_grad</code>, aucune fiche n'est écrite et <code>backward()</code> échoue ; <code>detach</code> coupe un chemin et laisse <code>.grad = None</code> (pas 0) aux poids situés avant la coupure.</li>
     <li>La boucle est forward, backward, mise à jour sous <code>no_grad</code>, remise à zéro. Un lr trop grand diverge (lr = 2,0) ; sans remise à zéro la loss oscille sans converger.</li>
   </ol>
+</section>
+
+<section id="porte">
+  <h2><span class="n">10</span>Explique avec tes mots</h2>
+  <p class="muted">Les trois questions de ton rapport, à savoir traiter sans le dépôt. Écris ta réponse sans regarder la page, puis révèle les points attendus et coche ceux que tu avais déjà. Ce que tu écris reste dans ce navigateur, nulle part ailleurs.</p>
+  <div class="card" id="porteBox"></div>
 </section>
 
 <section id="quiz">
@@ -1009,24 +1026,37 @@ footer { padding: 36px 0 60px; color: var(--muted); font-size: .85rem; }
   QUIZ.forEach((x, qi) => { const k = (qi * 3 + 1) % x.o.length; x.o = x.o.slice(k).concat(x.o.slice(0, k)); });
   const quizState = QUIZ.map(() => null);
   const quizBox = $('#quizBox');
+  const MISSED_KEY = 's01_quiz_missed';
+  const loadMissed = () => { try { return JSON.parse(localStorage.getItem(MISSED_KEY) || '[]'); } catch (e) { return []; } };
+  const saveMissed = (m) => { try { localStorage.setItem(MISSED_KEY, JSON.stringify(m)); } catch (e) { /* stockage indisponible : le quiz marche quand même */ } };
+  const shuffle = (a) => { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
+  let order = QUIZ.map((_, i) => i);   // indices (dans QUIZ) des questions affichées, dans l'ordre d'affichage
   const hintOf = (x) => (x.multi ? 'Coche toutes les bonnes réponses.' : 'Une seule bonne réponse.');
   function renderQuiz() {
-    quizBox.innerHTML = '<div class="quiz-head"><span class="score" id="qscore"></span><button id="qreset">↺ Recommencer le quiz</button></div>'
-      + QUIZ.map((x, qi) => `<div class="q" data-q="${qi}">
-        <p class="qt"><span class="tag ${x.trap ? 'trap' : ''}">${x.trap ? 'Piège' : 'Question ' + (qi + 1)}</span>${x.multi ? '<span class="tag multi">Plusieurs réponses</span>' : ''}${x.q}</p>
+    quizBox.innerHTML = '<div class="quiz-head"><span class="score" id="qscore"></span><span class="row"><button id="qreset">↺ Recommencer</button><button id="qshuf">⇄ Mélanger</button><button id="qmiss"></button><button id="qall">Toutes les questions</button></span></div>'
+      + order.map((qi, pos) => { const x = QUIZ[qi]; return `<div class="q" data-q="${qi}">
+        <p class="qt"><span class="tag ${x.trap ? 'trap' : ''}">${x.trap ? 'Piège' : 'Question ' + (pos + 1)}</span>${x.multi ? '<span class="tag multi">Plusieurs réponses</span>' : ''}${x.q}</p>
         <p class="hint">${hintOf(x)}</p>
         ${x.o.map((o, oi) => `<label class="opt" data-o="${oi}"><input type="${x.multi ? 'checkbox' : 'radio'}" name="q${qi}"><span class="ot">${o.t}<span class="why">${o.ok ? '✓ Vrai. ' : '✗ Faux. '}${o.why}</span></span></label>`).join('')}
         <div class="row"><button class="check on">Valider</button></div>
         <div class="explain"><p class="res"></p>${x.ref ? `<p class="muted">À relire : <a href="${x.ref}">${x.ref}</a></p>` : ''}</div>
-      </div>`).join('');
-    updateScore();
+      </div>`; }).join('');
+    updateScore(); updateMissedBtn();
+  }
+  function updateMissedBtn() {
+    const n = QUIZ.filter((x) => loadMissed().includes(x.q)).length, b = $('#qmiss');
+    b.textContent = `Refaire les ratées (${n})`; b.disabled = n === 0;
+    $('#qall').hidden = order.length === QUIZ.length;
   }
   function updateScore() {
-    const done = quizState.filter(Boolean), right = done.filter((r) => r.right).length;
-    $('#qscore').textContent = `Score : ${right} / ${QUIZ.length}` + (done.length < QUIZ.length ? ` (${done.length} répondue${done.length > 1 ? 's' : ''})` : ' : terminé');
+    const done = order.filter((qi) => quizState[qi]), right = done.filter((qi) => quizState[qi].right).length;
+    $('#qscore').textContent = `Score : ${right} / ${order.length}` + (done.length < order.length ? ` (${done.length} répondue${done.length > 1 ? 's' : ''})` : ' : terminé');
   }
   quizBox.addEventListener('click', (e) => {
     if (e.target.id === 'qreset') { quizState.fill(null); renderQuiz(); return; }
+    if (e.target.id === 'qshuf') { shuffle(order); order.forEach((qi) => shuffle(QUIZ[qi].o)); quizState.fill(null); renderQuiz(); return; }
+    if (e.target.id === 'qmiss') { const m = loadMissed(); order = QUIZ.map((_, i) => i).filter((i) => m.includes(QUIZ[i].q)); quizState.fill(null); renderQuiz(); return; }
+    if (e.target.id === 'qall') { order = QUIZ.map((_, i) => i); quizState.fill(null); renderQuiz(); return; }
     const btn = e.target.closest('button.check'); if (!btn) return;
     const box = btn.closest('.q'), qi = +box.dataset.q, x = QUIZ[qi];
     if (quizState[qi]) return;
@@ -1047,9 +1077,85 @@ footer { padding: 36px 0 60px; color: var(--muted); font-size: .85rem; }
     res.className = 'res ' + (right ? 'ok' : nbOk > 0 && nbBad === 0 ? 'part' : 'ko');
     res.textContent = right ? 'Correct.' : nbOk > 0 && nbBad === 0 ? `Incomplet : tu as trouvé ${nbOk} bonne(s) réponse(s) sur ${total}.` : 'Pas tout à fait.';
     box.classList.add('done'); btn.disabled = true;
-    updateScore();
+    saveMissed(loadMissed().filter((t) => t !== x.q).concat(right ? [] : [x.q]));
+    updateScore(); updateMissedBtn();
   });
   renderQuiz();
+
+  /* ================= Prédire avant de voir : la zone interactive reste grisée tant qu'on n'a pas répondu ================= */
+  const satDw1 = () => { const h = Math.tanh(3 * 2), yh = -0.4 * h; return 2 * (yh - 1) * -0.4 * (1 - h * h) * 2; };
+  const PRED = [
+    { id: 'p3', target: '#s3 > .card', q: 'Avec le préréglage « Tanh saturée » (x = 2, w1 = 3, les autres valeurs du rapport), la loss est grande. Que va valoir dw1 ?',
+      o: ['Grand : plus de 0,39, puisque l\'erreur est grande', 'À peu près pareil qu\'au point du rapport (environ 0,39)', 'Quasi nul : moins de 0,01, malgré la grande erreur', 'Négatif, puisque la loss est élevée'], ok: 2,
+      reveal: () => `Réponse : quasi nul. Ici dw1 = ${sci(satDw1())} : a = 6, donc h ≈ 1 et 1 − h² ≈ 2,5e-5 écrase le produit. Vérifie avec le préréglage et le curseur d'étapes ci-dessous.` },
+    { id: 'p4', target: '#s4 > .card', q: 'Le réseau a 5 opérations (× w1, tanh, × w2, − y, carré) et 2 poids. Combien de nœuds contient son graphe, <code>AccumulateGrad</code> compris ?',
+      o: ['5 nœuds : un par opération', '6 nœuds : une opération de plus', '7 nœuds : 5 opérations et 2 feuilles', '9 nœuds : un par nombre de la chaîne'], ok: 2,
+      reveal: () => `Réponse : 7. Le vrai <code>graph_nodes</code> renvoie ${D ? D.graphNodes.length + ' nœuds : ' + D.graphNodes.join(', ') : '7 nœuds'}. Chaque poids (feuille) a son <code>AccumulateGrad</code> ; x et y n'en ont pas. Retrouve-les dans le graphe ci-dessous.` },
+    { id: 'p5', target: '#s5 > .card', q: 'Tu viens de faire un <code>forward + backward()</code>, puis tu rappelles <code>loss.backward()</code> tout de suite, sans refaire la passe avant. Que se passe-t-il ?',
+      o: ['w1.grad double, comme une accumulation', 'Rien : le deuxième appel ne fait rien', 'Une erreur : le graphe a déjà été libéré', 'w1.grad est remis à zéro automatiquement'], ok: 2,
+      reveal: () => `Réponse : une erreur. Message réel de PyTorch : « ${D && D.secondBackwardSameGraph ? D.secondBackwardSameGraph.split(' (or')[0] : 'Trying to backward through the graph a second time'} ». Le graphe est libéré par le premier <code>backward()</code>. Essaie le bouton « backward() seul » ci-dessous.` },
+    { id: 'p7', target: '#s7 > .card', q: 'Tu lances 50 pas de descente avec lr = 2,0 (au lieu de 0,1). Que fait la loss ?',
+      o: ['Elle descend plus vite que pour lr = 0,1, presque jusqu\'à 0', 'Elle descend, mais plus lentement que pour lr = 0,1', 'Elle reste bloquée à sa valeur de départ, environ 1,33', 'Elle diverge : elle grandit au lieu de diminuer'], ok: 3,
+      reveal: () => `Réponse : elle diverge. Valeur réelle après 50 pas : ${D ? sci(D.descent['2.0'][49]) : '4,21e38'}, alors que lr = 1,0 donne 0. Le gradient donne la direction, pas la distance jusqu'au creux. Vérifie avec les boutons de lr ci-dessous.` },
+  ];
+  PRED.forEach((p) => {
+    const target = $(p.target); if (!target) return;
+    const box = document.createElement('div'); box.className = 'predict'; box.id = p.id;
+    box.innerHTML = `<h4>Prédis d'abord</h4><p>${p.q}</p>` + p.o.map((t, i) => `<label class="opt" data-o="${i}"><input type="radio" name="${p.id}"><span class="ot">${t}</span></label>`).join('')
+      + '<div class="row"><button class="on pv">Valider ma prédiction</button><button class="skip">Passer, je veux juste explorer</button></div><p class="muted pmsg"></p><div class="tip pres" hidden></div>';
+    target.before(box);
+    target.classList.add('locked'); target.setAttribute('inert', '');
+    const unlock = () => { target.classList.remove('locked'); target.removeAttribute('inert'); box.querySelectorAll('input,button').forEach((b) => { b.disabled = true; }); };
+    box.querySelector('.skip').addEventListener('click', unlock);
+    box.querySelector('.pv').addEventListener('click', () => {
+      const idx = [...box.querySelectorAll('input')].findIndex((i) => i.checked);
+      if (idx < 0) { box.querySelector('.pmsg').textContent = 'Choisis une réponse, ou passe.'; return; }
+      box.querySelectorAll('.opt').forEach((l, i) => l.classList.add(i === p.ok ? (i === idx ? 'good' : 'miss') : i === idx ? 'wrong' : 'neutral'));
+      const pres = box.querySelector('.pres'); pres.hidden = false;
+      pres.innerHTML = `<b>${idx === p.ok ? 'Bien vu.' : 'Pas tout à fait : tu avais prédit autre chose.'}</b> ${p.reveal()}`;
+      box.querySelector('.pmsg').textContent = '';
+      unlock();
+    });
+  });
+
+  /* ================= Explique avec tes mots (questions de la porte, texte libre + points à cocher) ================= */
+  const PORTE = [
+    { q: 'Pourquoi <code>.grad</code> vaut-il le double après deux <code>backward()</code> sans remise à zéro, et à quel endroit d\'une boucle d\'entraînement fait-on cette remise à zéro ?',
+      pts: ['<code>backward()</code> <b>ajoute</b> au <code>.grad</code> existant (<code>AccumulateGrad</code>, +=) : il n\'écrase pas.',
+        'Deux appels au même point versent deux fois le même gradient : exactement le double (0,788543 contre 0,394271).',
+        'PyTorch additionne parce qu\'un même poids peut servir à plusieurs endroits du réseau : chaque usage verse sa contribution.',
+        'La remise à zéro se fait <b>après la mise à jour des poids</b>, avant le <code>backward()</code> suivant (<code>w.grad = None</code> ou <code>optimizer.zero_grad()</code>).',
+        'L\'oubli ne produit aucune erreur : l\'entraînement est faussé en silence (la loss oscille au lieu de converger).'] },
+    { q: 'Que représente <code>grad_fn</code> d\'un tenseur, et pourquoi un tenseur créé sous <code>torch.no_grad()</code> n\'en a-t-il pas ?',
+      pts: ['<code>grad_fn</code> est le <b>nœud du graphe</b> qui a produit ce tenseur (par exemple <code>TanhBackward0</code>) : il garde ses entrées et sait calculer sa dérivée locale.',
+        'Il est écrit pendant la passe avant ; <code>backward()</code> relit ces nœuds à l\'envers.',
+        'Les feuilles (w1, w2) n\'en ont pas : elles ne sont pas le résultat d\'une opération.',
+        'Sous <code>no_grad</code>, l\'enregistrement est suspendu : aucune fiche n\'est écrite, donc <code>grad_fn</code> vaut <code>None</code>, et <code>backward()</code> échoue.'] },
+    { q: 'Pourquoi la mise à jour des poids se fait-elle sous <code>torch.no_grad()</code> ?',
+      pts: ['La mise à jour n\'est pas une opération du modèle : elle ne doit pas entrer dans le graphe.',
+        'Modifier en place une feuille qui requiert un gradient est refusé par PyTorch (« a leaf Variable that requires grad is being used in an in-place operation »).',
+        'Sous <code>no_grad</code>, la valeur change sans laisser de trace, et les poids gardent <code>requires_grad=True</code>.',
+        'Contourner avec <code>w1 = w1 - lr * w1.grad</code> donne un poids qui n\'est plus une feuille (<code>SubBackward0</code>) : son <code>.grad</code> ne sera plus rempli.'] },
+  ];
+  const PORTE_KEY = 's01_porte';
+  const loadPorte = () => { try { return JSON.parse(localStorage.getItem(PORTE_KEY) || '{}'); } catch (e) { return {}; } };
+  const savePorte = (v) => { try { localStorage.setItem(PORTE_KEY, JSON.stringify(v)); } catch (e) { /* stockage indisponible */ } };
+  (() => {
+    const saved = loadPorte();
+    $('#porteBox').innerHTML = PORTE.map((x, i) => `<div class="porte-q" data-i="${i}"><p><b>${i + 1}.</b> ${x.q}</p>
+      <textarea aria-label="Ta réponse à la question ${i + 1}" placeholder="Écris ta réponse avec tes mots, sans regarder la page."></textarea>
+      <div class="row"><button class="on reveal">Voir les points attendus</button></div>
+      <div class="pts" hidden>${x.pts.map((t, k) => `<label><input type="checkbox" data-k="${k}"><span>${t}</span></label>`).join('')}<p class="muted sc"></p></div></div>`).join('');
+    document.querySelectorAll('.porte-q').forEach((box) => {
+      const i = +box.dataset.i, ta = box.querySelector('textarea'), s = saved[i] || {};
+      ta.value = s.text || '';
+      const score = () => { const n = box.querySelectorAll('.pts input:checked').length; box.querySelector('.sc').textContent = `Points que tu avais : ${n} / ${PORTE[i].pts.length}. Ceux que tu n'as pas cochés sont à relire dans la section indiquée par le résumé.`; };
+      const persist = () => { const all = loadPorte(); all[i] = { text: ta.value, got: [...box.querySelectorAll('.pts input')].map((c) => c.checked) }; savePorte(all); };
+      ta.addEventListener('input', persist);
+      box.querySelector('.reveal').addEventListener('click', () => { box.querySelector('.pts').hidden = false; box.querySelector('.reveal').disabled = true; score(); });
+      box.querySelectorAll('.pts input').forEach((c, k) => { c.checked = !!(s.got && s.got[k]); c.addEventListener('change', () => { score(); persist(); }); });
+    });
+  })();
 
   /* ================= Extraits de code (lus dans steps/s01_autograd.py via donnees/s01.js) ================= */
   (() => {

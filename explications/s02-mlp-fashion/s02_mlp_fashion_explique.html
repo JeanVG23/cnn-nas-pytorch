@@ -1,0 +1,1115 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Étape 2 : MLP sur FashionMNIST, expliqué en manipulant</title>
+<style>
+:root {
+  --bg: #f7f7f4;
+  --surface: #ffffff;
+  --surface2: #efefe9;
+  --text: #1d1f23;
+  --muted: #5d6470;
+  --line: #d9d9d0;
+  --accent: #d9480f;
+  --pos: #ff922b;
+  --on-strong: #14161a;
+  --hl: #7048e8;
+  --ok: #2b8a3e;
+  --bad: #c92a2a;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #14161a;
+    --surface: #1d2026;
+    --surface2: #262a32;
+    --text: #eceae4;
+    --muted: #a0a6b0;
+    --line: #353a44;
+    --accent: #ff922b;
+    --hl: #9775fa;
+    --ok: #69db7c;
+    --bad: #ff8787;
+  }
+}
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; scroll-padding-top: 64px; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font: 16px/1.6 system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+.wrap { max-width: 980px; margin: 0 auto; padding: 0 16px; }
+
+/* En-tête et navigation */
+header.hero { padding: 40px 0 16px; }
+header.hero h1 { font-size: clamp(1.7rem, 5vw, 2.5rem); line-height: 1.2; margin: 0 0 12px; }
+.lead { font-size: 1.1rem; color: var(--muted); max-width: 68ch; margin: 0; }
+nav.top {
+  position: sticky; top: 0; z-index: 10;
+  background: color-mix(in srgb, var(--bg) 92%, transparent);
+  backdrop-filter: blur(6px);
+  border-bottom: 1px solid var(--line);
+}
+nav.top .wrap { display: flex; gap: 4px 14px; flex-wrap: wrap; padding-top: 10px; padding-bottom: 10px; }
+nav.top a { color: var(--muted); text-decoration: none; font-size: .9rem; font-weight: 600; }
+nav.top a:hover { color: var(--accent); }
+
+/* Sections */
+section { padding: 36px 0 8px; }
+section h2 { font-size: 1.5rem; margin: 0 0 8px; }
+section h2 .n {
+  display: inline-grid; place-items: center; width: 1.7em; height: 1.7em;
+  border-radius: 50%; background: var(--accent); color: #fff; font-size: .8em; margin-right: 8px;
+}
+@media (prefers-color-scheme: dark) { section h2 .n { color: #14161a; } }
+p { margin: 0 0 12px; max-width: 74ch; }
+a { color: var(--hl); }
+.muted { color: var(--muted); }
+.card {
+  background: var(--surface); border: 1px solid var(--line);
+  border-radius: 12px; padding: 16px; margin: 14px 0;
+}
+.card h3, .card h4 { margin: 0 0 6px; }
+.card h3 { font-size: 1.05rem; }
+code, .mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .92em; }
+.tip {
+  border-left: 4px solid var(--hl); background: var(--surface2);
+  padding: 10px 14px; border-radius: 0 8px 8px 0; margin: 14px 0; max-width: 74ch;
+}
+.warn {
+  border-left: 4px solid var(--bad); background: var(--surface2);
+  padding: 10px 14px; border-radius: 0 8px 8px 0; margin: 14px 0; max-width: 74ch;
+}
+
+/* Boutons et champs */
+.row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 10px 0; }
+button {
+  font: inherit; font-size: .9rem; cursor: pointer;
+  background: var(--surface); color: var(--text);
+  border: 1px solid var(--line); border-radius: 8px; padding: 6px 12px;
+}
+button:hover { border-color: var(--accent); }
+button.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+@media (prefers-color-scheme: dark) { button.on { color: #14161a; } }
+input[type="text"], input[type="number"] {
+  font: 600 15px ui-monospace, Menlo, monospace; padding: 6px 10px; min-width: 0;
+  background: var(--surface); color: var(--text); border: 1px solid var(--line); border-radius: 8px;
+}
+input[type="text"] { width: min(100%, 30ch); }
+input[type="number"] { width: 6ch; }
+input[type="text"]:focus, input[type="number"]:focus { outline: 2px solid var(--hl); }
+input[type="range"] { accent-color: var(--accent); width: min(100%, 320px); }
+label.f { font-size: .9rem; color: var(--muted); }
+
+.chars { display: flex; flex-wrap: wrap; gap: 4px; margin: 8px 0; }
+.pairs { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0; }
+.pair { font: 600 13px ui-monospace, Menlo, monospace; padding: 4px 9px; }
+.pair.cur { border-color: var(--hl); outline: 2px solid var(--hl); }
+.pick { font: 600 14px ui-monospace, Menlo, monospace; min-width: 2.4em; }
+
+/* Extraits du vrai code, lus dans le fichier du projet via donnees/*.js (source.lines) */
+.codeblock { margin: 12px 0; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); }
+.codeblock summary { cursor: pointer; padding: 8px 12px; font-weight: 600; }
+.codeblock summary .muted { font-weight: 400; }
+.codeblock pre { margin: 0; padding: 8px 12px; background: var(--surface2); border-top: 1px solid var(--line); font: 13px/1.6 ui-monospace, Menlo, monospace; overflow-x: auto; white-space: pre; }
+.codeblock .ln { display: inline-block; width: 3.2ch; margin-right: 1.2ch; color: var(--muted); text-align: right; user-select: none; }
+.codeblock .gap { color: var(--muted); padding-left: 4.4ch; }
+.codeblock .map { margin: 0; padding: 8px 12px; border-top: 1px solid var(--line); font-size: .92rem; }
+.predict { border: 2px solid var(--hl); border-radius: 10px; background: var(--surface); padding: 12px 14px; margin: 12px 0; }
+.predict h4 { margin: 0 0 6px; }
+.predict > p { max-width: 74ch; }
+.predict .tip { margin-bottom: 0; }
+.locked { opacity: .35; filter: grayscale(.5); pointer-events: none; }
+.porte-q { margin: 14px 0; }
+.porte-q textarea { width: 100%; min-height: 96px; font: inherit; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); color: var(--text); resize: vertical; }
+.porte-q .pts { margin-top: 8px; }
+.porte-q .pts label { display: flex; gap: 8px; align-items: flex-start; margin: 6px 0; cursor: pointer; }
+.porte-q .pts input { margin-top: 5px; accent-color: var(--accent); flex: 0 0 auto; }
+.resume { max-width: 74ch; padding-left: 1.4em; }
+.resume li { margin: 6px 0; }
+
+/* Tables de nombres */
+.tblwrap { overflow-x: auto; padding-bottom: 6px; }
+table.mt { border-collapse: separate; border-spacing: 2px; font: 600 12px ui-monospace, Menlo, monospace; }
+table.mt th { color: var(--muted); font-weight: 700; padding: 2px 6px; min-width: 36px; }
+table.mt th.corner { font-size: 10px; font-weight: 600; text-align: right; }
+table.mt td {
+  min-width: 36px; height: 30px; text-align: center;
+  border: 1px solid var(--line); border-radius: 4px;
+}
+table.mt td.zero { color: var(--muted); }
+table.mt td.hot { color: var(--on-strong); }
+table.mt tr.dim td { opacity: .45; }
+
+table.pt { border-collapse: collapse; font-size: .9rem; width: 100%; }
+table.pt th, table.pt td { padding: 5px 8px; border-bottom: 1px solid var(--line); text-align: left; white-space: nowrap; }
+table.pt th { color: var(--muted); font-size: .8rem; }
+table.pt td.num { font-family: ui-monospace, Menlo, monospace; text-align: right; }
+.up { color: var(--ok); font-weight: 700; }
+.down { color: var(--bad); font-weight: 700; }
+.two { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 14px; }
+.two h4 { font-size: .95rem; }
+
+/* Curseurs de scores */
+.sl { display: grid; grid-template-columns: 40px 1fr 56px; gap: 10px; align-items: center; margin: 4px 0; }
+.sl input[type="range"] { width: 100%; }
+.sl output { font: 600 13px ui-monospace, Menlo, monospace; text-align: right; }
+
+/* Barres */
+.bar-row { display: grid; grid-template-columns: 56px 1fr 230px; gap: 10px; align-items: center; margin: 5px 0; font-size: .92rem; }
+.bar { height: 18px; background: var(--surface2); border-radius: 9px; overflow: hidden; border: 1px solid var(--line); }
+.bar span { display: block; height: 100%; background: var(--accent); transition: width .15s; }
+.ch {
+  display: inline-block; min-width: 1.7em; text-align: center; padding: 0 5px;
+  font: 600 .95em ui-monospace, Menlo, monospace;
+  background: var(--surface2); border: 1px solid var(--line); border-radius: 5px;
+}
+.formula { font: 13px/1.7 ui-monospace, Menlo, monospace; background: var(--surface2); border-radius: 8px; padding: 8px 12px; margin: 6px 0; overflow-x: auto; }
+.verdict { font-size: 1.05rem; font-weight: 700; margin-top: 8px; }
+.bad { color: var(--bad); }
+.stats { display: flex; flex-wrap: wrap; gap: 10px 26px; margin: 8px 0; }
+.stat b { display: block; font: 700 1.25rem ui-monospace, Menlo, monospace; }
+.stat span { font-size: .8rem; color: var(--muted); }
+canvas#curve { width: 100%; max-width: 640px; height: auto; display: block; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); }
+
+/* Quiz */
+.quiz-head { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; justify-content: space-between; margin-bottom: 4px; }
+.quiz-head .score { font-weight: 700; }
+.q { border: 1px solid var(--line); border-radius: 10px; padding: 14px; margin: 14px 0; background: var(--surface); }
+.q .qt { font-weight: 700; margin: 0 0 4px; max-width: none; }
+.q .hint { font-size: .85rem; color: var(--muted); margin: 0 0 8px; }
+.q .tag { display: inline-block; font-size: .7rem; font-weight: 700; letter-spacing: .03em; text-transform: uppercase; padding: 2px 8px; border-radius: 99px; background: var(--surface2); color: var(--muted); margin-right: 6px; vertical-align: 2px; }
+.q .tag.trap { background: var(--bad); color: #fff; }
+.q .tag.multi { background: var(--hl); color: #fff; }
+@media (prefers-color-scheme: dark) { .q .tag.trap, .q .tag.multi { color: #14161a; } }
+.opt { display: flex; gap: 10px; align-items: flex-start; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; margin: 6px 0; cursor: pointer; }
+.opt input { margin-top: 5px; accent-color: var(--accent); flex: 0 0 auto; }
+.opt .ot { min-width: 0; }
+.opt .why { display: none; font-size: .88rem; color: var(--muted); margin-top: 4px; }
+.q.done .opt { cursor: default; }
+.q.done .opt .why { display: block; }
+.opt.good { border-color: var(--ok); background: color-mix(in srgb, var(--ok) 13%, var(--surface)); }
+.opt.wrong { border-color: var(--bad); background: color-mix(in srgb, var(--bad) 13%, var(--surface)); }
+.opt.miss { border-color: var(--ok); border-style: dashed; }
+.q .explain { display: none; border-left: 4px solid var(--hl); background: var(--surface2); padding: 10px 14px; border-radius: 0 8px 8px 0; margin-top: 10px; }
+.q.done .explain { display: block; }
+.q .explain p { max-width: none; margin: 0 0 8px; }
+.q .res { font-weight: 700; margin-top: 8px; }
+.q .res.ok { color: var(--ok); } .q .res.part { color: var(--accent); } .q .res.ko { color: var(--bad); }
+
+footer { padding: 36px 0 60px; color: var(--muted); font-size: .85rem; }
+
+@media (max-width: 700px) {
+  .bar-row { grid-template-columns: 44px 1fr 120px; font-size: .8rem; }
+}
+/* Spécifique à la page de l'étape 2 */
+.chk { display: inline-flex; gap: 8px; align-items: center; cursor: pointer; font-size: .92rem; }
+canvas.cv { width: 100%; max-width: 640px; height: auto; display: block; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); margin: 8px 0; }
+.padrow { display: flex; flex-wrap: wrap; gap: 18px; align-items: flex-start; }
+.padwrap { position: relative; width: 280px; max-width: 100%; }
+.padwrap canvas { display: block; width: 100%; height: auto; image-rendering: pixelated; }
+#pad { border: 1px solid var(--line); border-radius: 6px; background: #000; touch-action: none; cursor: crosshair; }
+#padOver { position: absolute; left: 0; top: 0; pointer-events: none; image-rendering: auto; }
+canvas.strip { width: 100%; height: auto; display: block; border: 1px solid var(--line); border-radius: 6px; margin-top: 10px; }
+canvas.heat { width: 160px; height: auto; image-rendering: pixelated; border: 1px solid var(--line); border-radius: 4px; display: block; }
+.brow { display: grid; grid-template-columns: 112px 1fr minmax(150px, 280px); gap: 10px; align-items: center; margin: 4px 0; font-size: .88rem; }
+.brow.truth { font-weight: 700; }
+.brow .bar { height: 14px; }
+.lrow { display: grid; grid-template-columns: 76px 1fr; gap: 8px; align-items: center; margin: 5px 0; font-size: .85rem; }
+.bs { display: flex; flex-wrap: wrap; gap: 6px; }
+.bt { display: inline-flex; gap: 2px; padding: 3px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface2); }
+.sq { display: inline-grid; place-items: center; min-width: 26px; height: 26px; padding: 0 3px; border-radius: 5px; font: 700 12px ui-monospace, Menlo, monospace; color: #14161a; cursor: pointer; border: 2px solid transparent; }
+.sq.hl { border-color: #ff4d4d; outline: 2px solid #ff4d4d; }
+h4 { margin: 12px 0 4px; }
+.split { display: flex; height: 26px; border-radius: 6px; overflow: hidden; border: 1px solid var(--line); font-size: .8rem; margin: 6px 0; }
+.split span { display: grid; place-items: center; background: var(--surface2); white-space: nowrap; overflow: hidden; }
+.split .val { background: var(--accent); color: #fff; }
+.cells { display: flex; flex-wrap: wrap; gap: 4px; margin: 6px 0; }
+.cell { min-width: 52px; text-align: center; padding: 4px 6px; border: 1px solid var(--line); border-radius: 6px; font: 600 12px ui-monospace, Menlo, monospace; background: var(--surface); }
+.cell.zero { color: var(--muted); background: var(--surface2); }
+.codeblock .fh { display: block; color: var(--muted); font-weight: 700; margin-top: 4px; }
+.pt.wrap td, .pt.wrap th { white-space: normal; vertical-align: top; text-align: left; }
+.pt.wrap td:nth-child(2) { min-width: 240px; }
+@media (max-width: 700px) { .brow { grid-template-columns: 84px 1fr; } .brow span:last-child { grid-column: 1 / -1; } }
+.legend { font-size: .85rem; margin: 0 0 12px; max-width: none; }
+</style>
+</head>
+<body>
+
+<header class="hero">
+  <div class="wrap">
+    <h1>Comment un MLP apprend-il à classer des vêtements ?</h1>
+    <p class="lead">Étape 2 du projet : un perceptron multicouche 784 → 256 → 128 → 10 et sa boucle d'entraînement, écrite en entier dans <code>steps/s02_mlp_fashion.py</code>. Tu as vu l'autograd à l'étape 1 : ici tout s'enchaîne dans une vraie boucle d'entraînement, que la page exécute sur des tenseurs synthétiques. Sept sections à manipuler, puis un quiz.</p>
+  </div>
+</header>
+
+<nav class="top">
+  <div class="wrap">
+    <a href="#s1">1. Image</a>
+    <a href="#s2">2. Couches</a>
+    <a href="#s3">3. ReLU</a>
+    <a href="#s4">4. Logits, loss</a>
+    <a href="#s5">5. DataLoader</a>
+    <a href="#s6">6. Boucle</a>
+    <a href="#s7">7. train, eval</a>
+    <a href="#bilan">Bilan</a>
+    <a href="#resume">Résumé</a>
+    <a href="#porte">Explique</a>
+    <a href="#quiz">Quiz</a>
+  </div>
+</nav>
+
+<main class="wrap">
+
+<div class="warn"><b>Avant de commencer.</b> Si ta prédiction n'est pas encore écrite dans <code>experiments/s02-mlp-fashion.md</code> (précision de validation attendue après 10 époques, nombre de paramètres), écris-la maintenant : la section 2 donne le nombre de paramètres. Cette page n'a lancé <b>aucun entraînement sur FashionMNIST</b> : tous ses chiffres viennent de l'architecture, de la découpe d'indices, de petits modules PyTorch et de tenseurs synthétiques. La précision réelle viendra de ton propre entraînement.</div>
+
+<div class="card" id="inputs">
+  <h3>Ton image (toute la page s'y applique)</h3>
+  <p class="muted">Une image FashionMNIST fait 28 × 28 pixels en niveaux de gris. Dessine à la souris ou au doigt : elle traversera le <b>vrai MLP du palier</b> (poids tirés avec <code>set_seed(0)</code>, non entraîné). Les sections 1, 3 et 4 l'utilisent.</p>
+  <div class="padrow">
+    <div class="padwrap">
+      <canvas id="pad" width="28" height="28" aria-label="Zone de dessin 28 par 28"></canvas>
+      <canvas id="padOver" width="280" height="280" aria-hidden="true"></canvas>
+    </div>
+    <div>
+      <div class="row"><button id="mDraw" class="on">Dessiner</button><button id="mErase">Gommer</button></div>
+      <div class="row"><button id="pClear">Effacer</button><button id="pBlock">Bloc</button><button id="pDiag">Diagonale</button><button id="pNoise">Bruit</button></div>
+      <div class="stats" id="padStats"></div>
+    </div>
+  </div>
+</div>
+
+<!-- 1 --------------------------------------------------------------- -->
+<section id="s1">
+  <h2><span class="n">1</span>De l'image au vecteur : normaliser, puis aplatir</h2>
+  <p>Un MLP ne sait pas lire une grille : il attend une <b>liste de nombres</b>. Deux transformations préparent ton image. <code>ToTensor()</code> ramène chaque pixel de 0..255 à 0..1, puis <code>Normalize</code> recentre : <code>(v − moyenne) / écart-type</code>, avec les constantes de FashionMNIST. Ensuite <code>nn.Flatten</code> déplie la grille <b>ligne après ligne</b> : le pixel de la ligne <code>r</code> et de la colonne <code>c</code> devient le nombre d'indice <code>28 × r + c</code>.</p>
+  <p><b>À toi :</b> dessine quelque chose en haut, puis déplace les deux curseurs (ligne, colonne). Regarde l'indice dans le vecteur de 784 nombres et la valeur avant et après normalisation.</p>
+  <div class="card">
+    <div class="sl" style="grid-template-columns:70px 1fr 40px"><b>ligne r</b><input type="range" id="s1r" min="0" max="27" step="1" value="3" aria-label="ligne"><output id="s1ro"></output></div>
+    <div class="sl" style="grid-template-columns:70px 1fr 40px"><b>colonne c</b><input type="range" id="s1c" min="0" max="27" step="1" value="5" aria-label="colonne"><output id="s1co"></output></div>
+    <div class="stats" id="s1info"></div>
+    <canvas class="strip" id="c1" width="784" height="46" aria-label="Le vecteur de 784 nombres, ligne après ligne"></canvas>
+    <p class="muted">Le vecteur de 784 nombres : une bande colorée par ligne de l'image (28 bandes de 28 nombres), le trait rouge marque l'indice choisi.</p>
+    <div class="tblwrap"><table class="pt" id="s1norm"></table></div>
+  </div>
+  <details class="codeblock" open data-code="common/data.py@17,29;steps/s02_mlp_fashion.py@27"><summary>Dans le code : <code>Normalize</code> et <code>nn.Flatten</code> <span class="muted">(<span class="cf"></span>)</span></summary><pre></pre><p class="map">L.17 donne la moyenne et l'écart-type de FashionMNIST ; l.29 chaîne <code>ToTensor()</code> (pixels 0..1) et <code>Normalize</code>, ce que montre le tableau « avant, après ». L.27 est l'aplatissement : <code>(B, 1, 28, 28)</code> devient <code>(B, 784)</code>, ce que montre la bande ci-dessus. Le tableau « PyTorch réel » vient d'un vrai <code>Normalize</code> appliqué par le script d'export.</p></details>
+  <div class="tip"><b>À retenir :</b> <code>Flatten</code> ne calcule rien, il réorganise : <code>(B, 1, 28, 28)</code> devient <code>(B, 784)</code>, une image par ligne du lot. Le réseau ne « voit » plus qu'il y avait des lignes et des colonnes : le voisin d'un pixel n'est plus qu'un indice parmi 784. Les convolutions (étape 3) garderont cette structure.</div>
+</section>
+
+<!-- 2 --------------------------------------------------------------- -->
+<section id="s2">
+  <h2><span class="n">2</span>Les couches Linear : formes et paramètres</h2>
+  <p>Une couche <code>nn.Linear(entrées, sorties)</code> calcule <code>y = W x + b</code> : une <b>matrice de poids</b> (sorties × entrées) et un <b>biais</b> par sortie. Ses paramètres sont donc <code>entrées × sorties + sorties</code>. Le MLP du palier empile trois couches, séparées par des <code>ReLU</code> qui n'ont, elles, aucun paramètre. Le <b>lot</b> <code>B</code> est la première dimension de chaque tenseur : il ne change jamais le nombre de paramètres.</p>
+  <p><b>À toi :</b> change la taille du lot, puis les tailles des deux couches cachées. Regarde quelle couche concentre presque tous les paramètres, et comment les formes suivent.</p>
+  <div class="card">
+    <div class="row"><span class="muted">lot B :</span><span id="s2B"></span></div>
+    <div class="row"><span class="muted">1re couche cachée :</span><span id="s2h1"></span></div>
+    <div class="row"><span class="muted">2e couche cachée :</span><span id="s2h2"></span></div>
+    <div class="tblwrap"><table class="pt" id="s2tbl"></table></div>
+    <div id="s2bars"></div>
+    <div class="muted" id="s2check"></div>
+  </div>
+  <details class="codeblock" open data-code="steps/s02_mlp_fashion.py@21-36"><summary>Dans le code : la classe <code>MLP</code> <span class="muted">(<span class="cf"></span>)</span></summary><pre></pre><p class="map">Chaque ligne du <code>nn.Sequential</code> (l.27 à 32) est une ligne du tableau, avec la forme en commentaire. Les tailles 256 et 128 sont écrites en dur : les curseurs de la page sont une expérience, pas une option du code. Le total réel (235 146) est compté par le script d'export avec <code>sum(p.numel() for p in model.parameters())</code>, comme à la l.83.</p></details>
+  <div class="tip"><b>À retenir :</b> avec 256 et 128 unités cachées, les paramètres vivent presque tous (85 %) dans la <b>première</b> couche (784 entrées × 256 sorties) ; change les tailles pour voir ce qui se passe quand elles se rapprochent. Le lot et les <code>ReLU</code> n'ajoutent aucun paramètre. Ce comptage, <code>sum(p.numel())</code>, est la mesure de coût la plus simple : elle reviendra à l'étape 5.</div>
+</section>
+
+<!-- 3 --------------------------------------------------------------- -->
+<section id="s3">
+  <h2><span class="n">3</span>ReLU : pourquoi une non-linéarité entre les couches</h2>
+  <p>Empiler deux couches <code>Linear</code> sans rien entre elles ne sert à rien : <code>W2 (W1 x + b1) + b2</code> se réécrit <code>(W2 W1) x + (W2 b1 + b2)</code>, une <b>seule</b> couche linéaire. <code>ReLU(v) = max(0, v)</code> casse cette fusion : elle remplace les valeurs négatives par 0 et laisse passer les positives. C'est ce coude qui permet à un réseau profond de calculer autre chose qu'une droite (ou un plan).</p>
+  <p><b>À toi :</b> dans le petit réseau à un neurone caché, règle les quatre curseurs avec ReLU décochée : la courbe reste une droite, quels que soient les réglages. Coche ReLU : un coude apparaît. Plus bas, regarde combien d'unités ReLU met à 0 pour ton dessin dans le vrai MLP.</p>
+  <div class="card">
+    <div class="sl"><b>w1</b><input type="range" id="s3w1" min="-2" max="2" step="0.1" value="1.5"><output></output></div>
+    <div class="sl"><b>b1</b><input type="range" id="s3b1" min="-2" max="2" step="0.1" value="-1"><output></output></div>
+    <div class="sl"><b>w2</b><input type="range" id="s3w2" min="-2" max="2" step="0.1" value="1"><output></output></div>
+    <div class="sl"><b>b2</b><input type="range" id="s3b2" min="-2" max="2" step="0.1" value="0"><output></output></div>
+    <div class="row"><label class="chk"><input type="checkbox" id="s3relu" checked> <span>avec <code>ReLU</code> entre les deux couches</span></label></div>
+    <canvas class="cv" id="c3" width="640" height="300" aria-label="Courbe de la sortie en fonction de l'entrée x"></canvas>
+    <div class="formula" id="s3form"></div>
+  </div>
+  <div class="card">
+    <h4>Ton dessin dans le vrai MLP (poids de <code>set_seed(0)</code>, non entraîné)</h4>
+    <div class="padrow">
+      <div><canvas class="heat" id="c3a" width="16" height="16" aria-label="Activations de la couche 1 après ReLU"></canvas><div class="muted">couche 1 : 256 unités</div></div>
+      <div><canvas class="heat" id="c3b" width="16" height="8" aria-label="Activations de la couche 2 après ReLU"></canvas><div class="muted">couche 2 : 128 unités</div></div>
+      <div class="stats" id="s3stats"></div>
+    </div>
+    <div class="muted" id="s3check"></div>
+  </div>
+  <details class="codeblock" open data-code="steps/s02_mlp_fashion.py@26-33"><summary>Dans le code : les <code>ReLU</code> du <code>nn.Sequential</code> <span class="muted">(<span class="cf"></span>)</span></summary><pre></pre><p class="map">Les <code>nn.ReLU()</code> des l.29 et l.31 sont ce que la case à cocher active ou retire. Les cartes de chaleur montrent leur sortie pour ton dessin : une case sombre est un neurone à 0 ou presque (le compteur donne les zéros de la passe JavaScript, qui refait celle de PyTorch : voir le contrôle). Le petit réseau à un neurone est un jouet recalculé dans la page ; le vrai MLP, lui, est exécuté avec ses vrais poids exportés.</p></details>
+  <div class="tip"><b>À retenir :</b> sans <code>ReLU</code>, des couches <code>Linear</code> empilées valent une seule couche : l'algèbre le démontre pour deux couches comme pour trois, et le script d'export l'a mesuré sur deux couches de PyTorch (petit réseau jouet en float64 : écart de l'ordre de 1e-16, contre 1,07 avec <code>ReLU</code>). La non-linéarité n'ajoute <b>aucun paramètre</b> : tout son effet vient de la forme de la fonction.</div>
+</section>
+
+<!-- 4 --------------------------------------------------------------- -->
+<section id="s4">
+  <h2><span class="n">4</span>Logits, softmax et CrossEntropyLoss</h2>
+  <p>La dernière couche renvoie <b>10 nombres bruts</b>, un par classe : les <b>logits</b>. Ils peuvent être négatifs ou grands. Le <b>softmax</b> les transforme en probabilités (positives, somme 1) : <code>p_i = e^(z_i) / somme(e^(z_j))</code>. La loss d'entropie croisée est <code>−ln(p_y)</code> pour la vraie classe <code>y</code> : petite quand le réseau donne beaucoup de probabilité à la bonne classe. <code>nn.CrossEntropyLoss</code> fait le softmax <b>elle-même</b>, de façon numériquement stable : on lui donne des logits et un entier de classe : lui passer des probabilités ne lève aucune erreur, mais la loss devient fausse.</p>
+  <p><b>À toi :</b> choisis la vraie classe, déplace les logits et regarde la loss. Teste « Vraie classe à +2, le reste à 0 », puis coche le piège « softmax avant la loss » et compare les deux valeurs. Le bouton « Logits de ton dessin » charge ceux du vrai MLP non entraîné.</p>
+  <div class="card">
+    <div class="row"><span class="muted">vraie classe y :</span><span id="s4cls"></span></div>
+    <div class="row" id="s4pre"></div>
+    <div id="s4sl"></div>
+    <div class="row"><label class="chk"><input type="checkbox" id="s4dsm"> <span>piège : appliquer un <code>softmax</code> avant <code>CrossEntropyLoss</code></span></label></div>
+    <div id="s4out"></div>
+    <div class="stats" id="s4stats"></div>
+    <div id="s4msg"></div>
+    <div class="muted" id="s4check"></div>
+  </div>
+  <details class="codeblock" open data-code="steps/s02_mlp_fashion.py@47-48,66,84"><summary>Dans le code : logits, loss et précision <span class="muted">(<span class="cf"></span>)</span></summary><pre></pre><p class="map">L.47 produit les logits <code>(B, 10)</code>, que l'on règle ici avec les curseurs ; l.48 est la loss (<code>nn.CrossEntropyLoss()</code>, l.84), sans softmax avant. L.66 prend l'<code>argmax</code> des <b>logits</b> pour la précision : le softmax est croissant, la classe prédite est la même avec ou sans lui (propriété mathématique du softmax, pas une mesure de la page). Le contrôle du bas compare ce moteur JavaScript à quatre cas calculés par PyTorch.</p></details>
+  <div class="tip"><b>À retenir :</b> avec 10 logits égaux, la loss vaut <code>ln 10 ≈ 2,3026</code> : c'est la valeur de départ attendue d'un réseau qui n'a encore aucune préférence. Un softmax ajouté avant <code>CrossEntropyLoss</code> ne lève aucune erreur : il change silencieusement la loss.</div>
+</section>
+
+<!-- 5 --------------------------------------------------------------- -->
+<section id="s5">
+  <h2><span class="n">5</span>DataLoader : lots, mélange et découpe train/val</h2>
+  <p>On n'entraîne pas sur les 55 000 images d'un coup : on fait un pas de gradient par <b>lot</b>, ce qui donne bien plus de pas par époque et demande moins de mémoire. Le <code>DataLoader</code> distribue les images par lots (<code>batch_size</code>). Avec <code>shuffle=True</code>, il tire à chaque <b>époque</b> une nouvelle permutation de tous les exemples avant de la découper en lots : la composition des lots change d'une époque à l'autre. Le loader de validation, lui, ne mélange pas. La <b>découpe</b> train/val (quelles 5 000 images sur 60 000 vont en validation) est un tirage à part, avec sa propre graine <code>SPLIT_SEED</code> : changer <code>--seed</code> ne change donc jamais les images de validation.</p>
+  <p><b>À toi :</b> sur un mini jeu de 20 éléments, change la taille de lot et la graine, puis décoche <code>shuffle</code>. Clique sur un élément : il s'allume dans toutes les époques, tu vois dans quel lot il atterrit. Plus bas, regarde les vraies tailles pour 55 000 images et la découpe train/val.</p>
+  <div class="card">
+    <div class="row"><span class="muted">batch_size :</span><span id="s5B"></span><span class="muted">graine :</span><span id="s5seed"></span></div>
+    <div class="row"><label class="chk"><input type="checkbox" id="s5shuf" checked> <span>train_loader : <code>shuffle=True</code></span></label></div>
+    <div id="s5rows"></div>
+    <div class="muted" id="s5note"></div>
+  </div>
+  <div class="two">
+    <div class="card"><h4>Les vraies tailles (55 000 images d'entraînement)</h4>
+      <div class="row"><span class="muted">batch_size :</span><span id="s5real"></span></div>
+      <div id="s5realout"></div>
+    </div>
+    <div class="card"><h4>La découpe train/val (60 000 images au départ)</h4>
+      <div class="row"><span class="muted">--seed du modèle :</span><span id="s5ms"></span></div>
+      <div class="row"><span class="muted">SPLIT_SEED :</span><span id="s5ss"></span></div>
+      <div id="s5splitout"></div>
+    </div>
+  </div>
+  <details class="codeblock" open data-code="common/data.py@20-24,27-34;steps/s02_mlp_fashion.py@45"><summary>Dans le code : <code>split_indices</code>, les loaders et la boucle sur les lots <span class="muted">(<span class="cf"></span>)</span></summary><pre></pre><p class="map">L.20-24 tire la découpe avec <code>SPLIT_SEED</code>, un générateur à part : changer <code>--seed</code> ne touche pas le jeu de validation (carte de droite). L.32 est <code>shuffle=True</code> pour l'entraînement, l.33 <code>shuffle=False</code> pour la validation (lots de 512, d'où 10 lots dont le dernier de 392). L.45 de <code>s02</code> est la boucle <code>for x, y in loader</code> : un tour par lot. Le mini jeu de 20 éléments est un jouet ; ses ordres de passage sont ceux d'un vrai <code>DataLoader</code>.</p></details>
+  <div class="tip"><b>À retenir :</b> <code>shuffle=True</code> change à chaque époque la <b>composition</b> des lots, pas seulement leur ordre. La validation ne mélange pas : sa loss et sa précision ne dépendent pas de l'ordre, un ordre fixe rend les mesures reproductibles. Et le dernier lot est plus petit quand la taille du jeu n'est pas un multiple de <code>batch_size</code> : cela compte pour la moyenne de la loss (section 6).</div>
+</section>
+
+<!-- 6 --------------------------------------------------------------- -->
+<section id="s6">
+  <h2><span class="n">6</span>Un pas, puis la boucle d'entraînement</h2>
+  <p>Un <b>pas</b> d'entraînement, pour un lot : <b>forward</b> (calculer les logits), <b>loss</b>, <code>optimizer.zero_grad()</code> (vider les <code>.grad</code>, étape 1), <code>loss.backward()</code>, <code>optimizer.step()</code> (Adam met à jour les poids). Une <b>époque</b> est un tour complet sur les lots ; la fonction renvoie la loss moyenne. L'optimiseur remplace le <code>w -= lr * w.grad</code> écrit à la main à l'étape 1.</p>
+  <p><b>À toi :</b> lance l'entraînement sur 30 époques, avec le jeu d'étiquettes aléatoires puis celles liées à l'image. Change le <code>lr</code>. Coche « <code>zero_grad</code> oublié » pour voir ce qui casse. Compare toujours la courbe sur les images <b>vues</b> et sur des images <b>jamais vues</b>.</p>
+  <div class="card">
+    <div class="row"><span class="muted">jeu synthétique :</span><span id="s6ds"></span></div>
+    <div class="row"><span class="muted">lr (Adam) :</span><span id="s6lr"></span><label class="chk"><input type="checkbox" id="s6nz"> <span><code>optimizer.zero_grad()</code> oublié (lr = 0,001)</span></label></div>
+    <div class="sl" style="grid-template-columns:64px 1fr 80px"><b>époque</b><input type="range" id="s6ep" min="0" max="30" step="1" value="0" aria-label="époque"><output id="s6epo"></output></div>
+    <div class="row"><button id="s6play" class="on">Animer</button><button id="s6reset">Remettre à 0</button></div>
+    <canvas class="cv" id="c6a" width="640" height="280" aria-label="Loss en échelle logarithmique"></canvas>
+    <p class="muted legend"><span style="color:var(--accent)">■</span> loss d'entraînement (moyenne de l'époque) &nbsp; <span style="color:var(--hl)">■</span> loss sur des images jamais vues &nbsp; <span>- - -</span> ln 10 : loss d'un réseau sans préférence (échelle logarithmique)</p>
+    <canvas class="cv" id="c6b" width="640" height="220" aria-label="Précision"></canvas>
+    <p class="muted legend"><span style="color:var(--accent)">■</span> précision sur les images d'entraînement &nbsp; <span style="color:var(--hl)">■</span> précision sur des images jamais vues &nbsp; <span>- - -</span> hasard : 10 %</p>
+    <div class="stats" id="s6stats"></div>
+    <div id="s6msg"></div>
+  </div>
+  <div class="card">
+    <h4>Pourquoi <code>loss.item() * len(y)</code> puis <code>/ n</code> ?</h4>
+    <p class="muted">Trois lots de 4, 4 et 2 exemples (le dernier est plus petit). Règle la loss moyenne de chaque lot.</p>
+    <div class="row"><label class="f">lot 1 (4)</label><input type="number" id="wl1" value="1" step="0.5" min="0"><label class="f">lot 2 (4)</label><input type="number" id="wl2" value="1" step="0.5" min="0"><label class="f">lot 3 (2)</label><input type="number" id="wl3" value="4" step="0.5" min="0"></div>
+    <div id="wout"></div>
+  </div>
+  <details class="codeblock" open data-code="steps/s02_mlp_fashion.py@39-54,85"><summary>Dans le code : <code>train_one_epoch</code> et l'optimiseur <span class="muted">(<span class="cf"></span>)</span></summary><pre></pre><p class="map">L.47-51 est un pas complet (forward, loss, <code>zero_grad</code>, <code>backward</code>, <code>step</code>) ; la case « oublié » retire la l.49. L.52-54 cumule <code>loss.item() * len(y)</code> et <code>n</code> : c'est la moyenne pondérée de la carte du bas. L.85 crée l'optimiseur Adam. Les courbes viennent de <code>train_one_epoch</code> et <code>evaluate</code> du palier, exécutés par le script d'export sur des <b>tenseurs synthétiques</b> (2 048 images pour l'entraînement, 512 jamais vues), pas sur FashionMNIST. La variante sans <code>zero_grad</code> est une copie de la boucle écrite dans le script d'export, pas dans <code>steps/</code>.</p></details>
+  <div class="tip"><b>À retenir :</b> la loss d'<b>entraînement</b> qui tombe vers 0 prouve que le réseau sait <b>mémoriser</b>, pas qu'il sait <b>généraliser</b> : sur des étiquettes tirées au hasard, il atteint 100 % sur ce qu'il a vu (avec lr = 0,001 ou moins) et reste au niveau du hasard sur le reste. C'est pour cela qu'on mesure sur un jeu de validation. Le <code>lr</code> et <code>zero_grad</code> sont des choix : aucun n'est automatique.</div>
+</section>
+
+<!-- 7 --------------------------------------------------------------- -->
+<section id="s7">
+  <h2><span class="n">7</span>train(), eval() et no_grad : deux interrupteurs indépendants</h2>
+  <p><code>model.train()</code> et <code>model.eval()</code> règlent le <b>comportement</b> de certaines couches : <code>Dropout</code> éteint au hasard une part des unités en entraînement (et ne fait rien en évaluation) ; <code>BatchNorm</code> normalise avec les statistiques du lot en entraînement, avec ses statistiques cumulées en évaluation. <code>torch.no_grad()</code>, lui, décide si PyTorch <b>enregistre le graphe</b> (étape 1). Ce sont deux interrupteurs sans rapport : <code>eval()</code> ne coupe pas les gradients.</p>
+  <p><b>À toi :</b> choisis un modèle, puis bascule le mode et le gradient. Le MLP du palier n'a ni <code>Dropout</code> ni <code>BatchNorm</code> : que se passe-t-il quand tu changes de mode ? Compare avec les deux autres.</p>
+  <div class="card">
+    <div class="row"><span class="muted">modèle :</span><span id="s7model"></span></div>
+    <div class="row"><span class="muted">mode :</span><button id="s7train" class="on">model.train()</button><button id="s7eval">model.eval()</button>
+      <span class="muted">gradient :</span><button id="s7gon" class="on">normal</button><button id="s7goff">torch.no_grad()</button></div>
+    <div class="row" id="s7popt"><span class="muted">p du Dropout :</span><span id="s7p"></span><button id="s7draw">Nouveau tirage</button></div>
+    <div id="s7out"></div>
+    <div id="s7flags"></div>
+  </div>
+  <details class="codeblock" open data-code="steps/s02_mlp_fashion.py@43,57-68"><summary>Dans le code : <code>model.train()</code>, <code>model.eval()</code> et <code>@torch.no_grad()</code> <span class="muted">(<span class="cf"></span>)</span></summary><pre></pre><p class="map">L.43 passe en mode entraînement au début de chaque époque ; l.60 passe en mode évaluation, et le décorateur l.57 coupe l'enregistrement du graphe : deux lignes, deux interrupteurs. Pour ce MLP la sortie ne dépend pas du mode (écart exactement 0 mesuré par le script d'export). Le Dropout de la page est un jouet recalculé en JavaScript ; les tirages réels de <code>nn.Dropout</code> et les valeurs de <code>BatchNorm1d</code> viennent de PyTorch.</p></details>
+  <div class="tip"><b>À retenir :</b> on appelle quand même <code>train()</code> et <code>eval()</code> ici par discipline : le jour où une couche sensible au mode apparaît (<code>BatchNorm</code> dès l'étape 3), l'oubli de <code>eval()</code> fausse l'évaluation sans erreur. <code>eval()</code> ne remplace pas <code>no_grad</code>, et <code>no_grad</code> ne remplace pas <code>eval()</code>.</div>
+</section>
+
+<!-- Bilan ------------------------------------------------------------>
+<section id="bilan">
+  <h2><span class="n">8</span>Bilan</h2>
+  <div class="two">
+    <div class="card"><h3>Ce que ça prouve</h3>
+      <p>Le MLP a 235 146 paramètres, dont 85 % dans la première couche ; les formes vont de <code>(B, 1, 28, 28)</code> à <code>(B, 10)</code> ; un réseau sans préférence a une loss de départ égale à <code>ln 10</code> ; <code>shuffle=True</code> recompose les lots à chaque époque ; la découpe train/val ne dépend pas de <code>--seed</code>. Sur des données synthétiques, le MLP sait mémoriser même des étiquettes aléatoires, et <code>train()</code> et <code>eval()</code> ne changent rien pour lui.</p>
+    </div>
+    <div class="card"><h3>Ce que ça ne prouve pas</h3>
+      <p>Aucune précision sur FashionMNIST : l'entraînement réel n'est pas lancé par cette page, et ta prédiction vient avant. Les courbes viennent d'un jeu synthétique de 2 048 images (une graine, un <code>batch_size</code> de 64) : elles illustrent un mécanisme, elles ne prédisent pas le comportement sur de vraies images. Les poids de la section 3 sont ceux d'une seule initialisation. Sur mps, deux exécutions de même graine peuvent différer légèrement (<code>set_seed</code> le dit) : un chiffre sur une graine reste une exploration.</p>
+    </div>
+  </div>
+  <div class="card" id="pont">
+    <h3>Où ça reviendra dans les prochaines étapes</h3>
+    <div class="tblwrap"><table class="pt wrap">
+      <tr><th>Dans l'étape 2</th><th>Ce que ça devient ensuite</th><th>Vu sur cette page ?</th></tr>
+      <tr><td>La boucle <code>train_one_epoch</code> / <code>evaluate</code> écrite à la main</td><td>Étape 3 : elle est reprise dans <code>common/train.py</code> (fonction <code>fit</code>). Le palier 2 reste figé avec sa version.</td><td>Oui (sections 6 et 7), sans <code>fit</code></td></tr>
+      <tr><td><code>model.train()</code> / <code>model.eval()</code> sans effet</td><td>Étape 3 : le CNN a des couches <code>BatchNorm</code> ; l'oubli de <code>eval()</code> y fausse alors l'évaluation.</td><td>Oui, avec <code>BatchNorm1d</code> (section 7)</td></tr>
+      <tr><td><code>sum(p.numel())</code></td><td>Étape 5 : la mesure du coût commence par le nombre de paramètres, puis les FLOPs et la latence.</td><td>Oui (section 2), pas les FLOPs</td></tr>
+      <tr><td><code>split_indices</code> et son <code>SPLIT_SEED</code></td><td>Étape 3 : la même fonction <code>split_indices</code> découpe CIFAR-10, et les décisions se prennent sur le jeu de validation. Le jeu test n'est lu qu'en fin d'étapes 3 et 5.</td><td>Oui (section 5), pas le jeu test</td></tr>
+      <tr><td>Une graine, un chiffre : exploration</td><td>Chiffres retenus sur 3 graines (moyenne et écart-type), via <code>common.results</code>.</td><td>Non</td></tr>
+    </table></div>
+  </div>
+  <div class="tip"><b>Limites et suite.</b> Ici un MLP sur des images aplaties. À l'étape 3, un CNN garde la structure en lignes et colonnes que <code>Flatten</code> détruit, et la boucle devient <code>fit</code>. Le quiz revient sur les points sensibles, dont ceux des trois questions du rapport.</div>
+</section>
+
+<section id="resume">
+  <h2><span class="n">9</span>Résumé en 10 lignes</h2>
+  <ol class="resume">
+    <li>Une image 28 × 28 est normalisée par <code>(v − 0,286) / 0,353</code>, puis <code>nn.Flatten</code> la déplie ligne après ligne : <code>(B, 1, 28, 28)</code> devient <code>(B, 784)</code>, et le pixel (r, c) a l'indice 28 r + c.</li>
+    <li><code>nn.Linear(n, m)</code> a <code>n × m + m</code> paramètres. Le MLP 784 → 256 → 128 → 10 en compte 235 146, dont 200 960 dans la première couche.</li>
+    <li>Le lot <code>B</code> est la première dimension des tenseurs et n'ajoute aucun paramètre ; les <code>ReLU</code> n'en ont pas non plus.</li>
+    <li>Sans <code>ReLU</code>, des couches <code>Linear</code> empilées valent une seule couche linéaire : la non-linéarité est ce qui rend le réseau profond utile.</li>
+    <li>Le réseau renvoie des <b>logits</b> <code>(B, 10)</code> ; le softmax les transforme en probabilités, et <code>CrossEntropyLoss</code> fait ce softmax elle-même : on lui donne des logits : des probabilités ne lèvent aucune erreur, mais faussent la loss.</li>
+    <li>La loss vaut <code>−ln(p)</code> de la vraie classe ; avec 10 logits égaux, elle vaut <code>ln 10 ≈ 2,3026</code>, le niveau de départ attendu.</li>
+    <li><code>shuffle=True</code> tire une nouvelle permutation de tous les exemples à chaque époque ; la validation ne mélange pas. La découpe train/val a son propre <code>SPLIT_SEED</code> : <code>--seed</code> ne la change pas.</li>
+    <li>Un pas : forward, loss, <code>zero_grad()</code>, <code>backward()</code>, <code>step()</code>. La loss de l'époque est une moyenne pondérée par la taille des lots (<code>loss.item() * len(y)</code>, puis <code>/ n</code>).</li>
+    <li>Une loss d'entraînement qui tombe à 0 ne prouve pas la généralisation (avec des étiquettes aléatoires, c'est de la pure mémorisation) : la validation (et, en fin d'étape, le jeu test) la mesure, sur des images jamais vues.</li>
+    <li><code>train()</code> / <code>eval()</code> règlent Dropout et BatchNorm (sans effet pour ce MLP) ; <code>no_grad</code> coupe l'enregistrement du graphe. Ce sont deux interrupteurs indépendants.</li>
+  </ol>
+</section>
+
+<section id="porte">
+  <h2><span class="n">10</span>Explique avec tes mots</h2>
+  <p class="muted">Les trois questions de ton rapport, à savoir traiter sans le dépôt. Écris ta réponse sans regarder la page, puis révèle les points attendus et coche ceux que tu avais déjà. Ce que tu écris reste dans ce navigateur, nulle part ailleurs.</p>
+  <div class="card" id="porteBox"></div>
+</section>
+
+<section id="quiz">
+  <h2>Quiz : peux-tu expliquer l'étape 2 ?</h2>
+  <p class="muted">Dix questions sur les points les plus sensibles de l'étape 2, dont plusieurs pièges. Après validation, chaque proposition, juste ou fausse, est expliquée.</p>
+  <div class="card" id="quizBox"></div>
+</section>
+
+</main>
+
+<footer>
+  <div class="wrap">Page pédagogique autonome : aucun réseau, aucune dépendance. Les valeurs « PyTorch réel » viennent de <code>donnees/s02.js</code>, produit par <code>explications/s02-mlp-fashion/scripts/exporter_s02.py</code> qui appelle le code de <code>steps/s02_mlp_fashion.py</code> et <code>common/data.py</code> sans les modifier. Aucune image de FashionMNIST n'est chargée : l'entraînement du palier attend ta prédiction. Les courbes d'entraînement, les ordres de lots, les tirages de Dropout et les valeurs de BatchNorm viennent aussi de ce fichier ; seuls le dessin, la passe avant du MLP, les formules et les petits réseaux jouets sont recalculés dans ta page.</div>
+</footer>
+
+<script src="donnees/s02.js"></script>
+<script>
+(() => {
+  const D = window.S02 || null;
+  const $ = (s) => document.querySelector(s);
+  const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  const fr = (x, d) => !Number.isFinite(x) ? String(x) : (Object.is(+x.toFixed(d), -0) ? 0 : x).toFixed(d).replace('.', ',');
+  const sci = (x) => !Number.isFinite(x) ? String(x) : x === 0 ? '0' : x.toExponential(2).replace('.', ',').replace('e+', 'e');
+  const num = (x, d = 4) => (x !== 0 && Number.isFinite(x) && (Math.abs(x) < 1e-3 || Math.abs(x) >= 1e5)) ? sci(x) : fr(x, d);
+  const nf = (n) => String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
+  const pct = (x) => fr(100 * x, 1) + ' %';
+  const sg = (v, d = 2) => (v < 0 ? '− ' : '+ ') + fr(Math.abs(v), d);   // terme signé : « + 1,00 » ou « − 1,00 »
+  const sum = (a) => a.reduce((x, y) => x + y, 0);
+  const css = (name) => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+  const group = (el, items, current, onPick, label = (v) => String(v)) => {
+    el.innerHTML = items.map((v) => `<button data-v="${v}" class="${String(v) === String(current) ? 'on' : ''}">${label(v)}</button>`).join('');
+    el.addEventListener('click', (e) => {
+      const b = e.target.closest('button'); if (!b) return;
+      el.querySelectorAll('button').forEach((x) => x.classList.toggle('on', x === b));
+      onPick(b.dataset.v);
+    });
+  };
+  if (!D) {
+    document.querySelector('main').insertAdjacentHTML('afterbegin', '<div class="warn"><b>donnees/s02.js introuvable.</b> Les valeurs « PyTorch réel » et les extraits de code sont absents ; relance <code>uv run python explications/s02-mlp-fashion/scripts/exporter_s02.py</code> depuis la racine du projet.</div>');
+  }
+
+  /* ================= Poids réels du MLP initial (set_seed(0)) ================= */
+  const dec = (s) => { const b = atob(s), u = new Uint8Array(b.length); for (let i = 0; i < b.length; i++) u[i] = b.charCodeAt(i); return new Float32Array(u.buffer); };
+  const W = D ? D.init.weights.map((l) => ({ w: dec(l.w), b: dec(l.b), o: l.shape[0], i: l.shape[1] })) : null;
+  const MEAN = D ? D.normalize.mean : 0.286, STD = D ? D.normalize.std : 0.353;
+  const lin = (l, x) => { const z = new Float64Array(l.o); for (let r = 0; r < l.o; r++) { let s = l.b[r]; const base = r * l.i; for (let c = 0; c < l.i; c++) s += l.w[base + c] * x[c]; z[r] = s; } return z; };
+  const relu = (z) => z.map((v) => Math.max(0, v));
+  function forward(x) {   // x : 784 valeurs déjà normalisées
+    const z1 = lin(W[0], x), a1 = relu(z1), z2 = lin(W[1], a1), a2 = relu(z2), logits = lin(W[2], a2);
+    return { z1, a1, z2, a2, logits };
+  }
+
+  /* ================= Mathématiques de la loss ================= */
+  const softmax = (z) => { const m = Math.max(...z), e = Array.from(z, (v) => Math.exp(v - m)), s = sum(e); return e.map((v) => v / s); };
+  const crossEntropy = (z, y) => { const m = Math.max(...z); return m + Math.log(sum(Array.from(z, (v) => Math.exp(v - m)))) - z[y]; };
+
+  /* ================= Etat ================= */
+  const state = {
+    img: new Float32Array(784), mode: 'draw', r: 3, c: 5,
+    B: 128, h1: 256, h2: 128,
+    w1: 1.5, b1: -1, w2: 1, b2: 0, relu: true,
+    logits: new Array(10).fill(0), y: 3, dsm: false,
+    s5B: 4, s5seed: '0', s5shuf: true, s5real: 128, s5ms: '0', s5ss: '1234', s5hl: null,
+    s6ds: 'random', s6lr: '0.001', s6nz: false, s6e: 0,
+    s7model: 'mlp', s7mode: 'train', s7grad: 'on', s7p: '0.5', s7draw: 0,
+    fw: null,
+  };
+  const classes = D ? D.classes : Array.from({ length: 10 }, (_, i) => 'classe ' + i);
+
+  /* ================= Image commune : dessin ================= */
+  const pad = $('#pad'), pctx = pad.getContext('2d'), over = $('#padOver'), octx = over.getContext('2d');
+  const imgData = pctx.createImageData(28, 28);
+  function drawPad() {
+    for (let i = 0; i < 784; i++) { const g = Math.round(255 * state.img[i]); imgData.data[4 * i] = g; imgData.data[4 * i + 1] = g; imgData.data[4 * i + 2] = g; imgData.data[4 * i + 3] = 255; }
+    pctx.putImageData(imgData, 0, 0);
+    octx.clearRect(0, 0, 280, 280);
+    octx.strokeStyle = '#ff4d4d'; octx.lineWidth = 2;
+    octx.strokeRect(state.c * 10 + 1, state.r * 10 + 1, 8, 8);
+    octx.globalAlpha = .35; octx.strokeRect(0, state.r * 10, 280, 10); octx.globalAlpha = 1;
+  }
+  const normalized = () => Float32Array.from(state.img, (v) => (v - MEAN) / STD);
+  function recompute() { if (W) state.fw = forward(normalized()); }
+  let raf = 0;
+  function padChanged() { if (raf) return; raf = setTimeout(() => { raf = 0; drawPad(); recompute(); r1(); r3b(); updatePadStats(); }, 16); }
+  function paintAt(ev) {
+    const rect = pad.getBoundingClientRect();
+    const cx = Math.floor((ev.clientX - rect.left) / rect.width * 28), cy = Math.floor((ev.clientY - rect.top) / rect.height * 28);
+    if (cx < 0 || cx > 27 || cy < 0 || cy > 27) return;
+    const set = (x, y, v) => { if (x >= 0 && x < 28 && y >= 0 && y < 28) { const i = y * 28 + x; state.img[i] = state.mode === 'draw' ? Math.max(state.img[i], v) : 0; } };
+    if (state.mode === 'draw') { set(cx, cy, 1); [[1, 0], [-1, 0], [0, 1], [0, -1]].forEach(([dx, dy]) => set(cx + dx, cy + dy, .6)); }
+    else for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) set(cx + dx, cy + dy, 0);
+    state.r = cy; state.c = cx; $('#s1r').value = cy; $('#s1c').value = cx;
+    padChanged();
+  }
+  let down = false;
+  pad.addEventListener('pointerdown', (e) => { down = true; pad.setPointerCapture(e.pointerId); paintAt(e); });
+  pad.addEventListener('pointermove', (e) => { if (down) paintAt(e); });
+  pad.addEventListener('pointerup', () => { down = false; });
+  pad.addEventListener('pointercancel', () => { down = false; });
+  const setMode = (m) => { state.mode = m; $('#mDraw').classList.toggle('on', m === 'draw'); $('#mErase').classList.toggle('on', m === 'erase'); };
+  $('#mDraw').addEventListener('click', () => setMode('draw')); $('#mErase').addEventListener('click', () => setMode('erase'));
+  const preset = (fn) => { state.img.fill(0); fn(state.img); padChanged(); };
+  $('#pClear').addEventListener('click', () => preset(() => {}));
+  $('#pBlock').addEventListener('click', () => preset((a) => { for (let y = 8; y < 20; y++) for (let x = 8; x < 20; x++) a[y * 28 + x] = 1; }));
+  $('#pDiag').addEventListener('click', () => preset((a) => { for (let i = 0; i < 28; i++) { a[i * 28 + i] = 1; if (i < 27) a[i * 28 + i + 1] = .6; if (i > 0) a[i * 28 + i - 1] = .6; } }));
+  $('#pNoise').addEventListener('click', () => preset((a) => { for (let i = 0; i < 784; i++) a[i] = Math.random(); }));
+  function updatePadStats() {
+    const lit = state.img.filter((v) => v > 0).length, mean = sum(Array.from(state.img)) / 784;
+    $('#padStats').innerHTML = `<div class="stat"><b>${lit}</b><span>pixels allumés sur 784</span></div><div class="stat"><b>${fr(mean, 3)}</b><span>valeur moyenne (0..1)</span></div>`;
+  }
+
+  /* ================= Section 1 : normaliser et aplatir ================= */
+  const c1 = $('#c1'), g1 = c1.getContext('2d');
+  function r1() {
+    const { r, c } = state, i = 28 * r + c, v = state.img[i], n = (v - MEAN) / STD;
+    $('#s1ro').textContent = r; $('#s1co').textContent = c;
+    $('#s1info').innerHTML = `<div class="stat"><b>${i}</b><span>indice dans le vecteur : 28 × ${r} + ${c}</span></div><div class="stat"><b>${fr(v, 2)}</b><span>pixel après ToTensor (0..1)</span></div><div class="stat"><b>${fr(n, 4)}</b><span>après Normalize</span></div>`;
+    g1.clearRect(0, 0, 784, 46);
+    for (let k = 0; k < 784; k++) {
+      g1.fillStyle = `hsl(${(Math.floor(k / 28) * 13) % 360} 55% 55%)`; g1.fillRect(k, 0, 1, 8);
+      const gv = Math.round(255 * state.img[k]); g1.fillStyle = `rgb(${gv},${gv},${gv})`; g1.fillRect(k, 10, 1, 24);
+    }
+    g1.fillStyle = css('--muted'); for (let k = 0; k <= 784; k += 28) g1.fillRect(k, 36, 1, 6);
+    g1.fillStyle = '#ff4d4d'; g1.fillRect(i - 1, 0, 3, 46);
+    drawPad();
+  }
+  function renderNorm() {
+    const rows = D ? D.normalize.inputs.map((x, k) => [x, (x - MEAN) / STD, D.normalize.outputs[k]]) : [];
+    $('#s1norm').innerHTML = '<tr><th>pixel (0..1)</th><th>formule (v − 0,286) / 0,353</th><th>PyTorch réel (Normalize)</th></tr>'
+      + rows.map(([x, f, t]) => `<tr><td class="num">${fr(x, 2)}</td><td class="num">${fr(f, 4)}</td><td class="num">${fr(t, 4)}</td></tr>`).join('')
+      + (D ? `<tr><td colspan="3" class="muted">Aplatissement réel : le pixel (3, 5) est l'indice ${D.flatten.pixel_3_5[0]}, ${D.flatten.rowMajor ? 'et le vecteur complet est bien rangé ligne après ligne.' : ''}</td></tr>` : '');
+  }
+  $('#s1r').addEventListener('input', (e) => { state.r = +e.target.value; r1(); });
+  $('#s1c').addEventListener('input', (e) => { state.c = +e.target.value; r1(); });
+
+  /* ================= Section 2 : couches et paramètres ================= */
+  const SIZES = [16, 32, 64, 128, 256, 512, 1024];
+  group($('#s2B'), [1, 32, 64, 128, 256, 512], state.B, (v) => { state.B = +v; r2(); });
+  group($('#s2h1'), SIZES, state.h1, (v) => { state.h1 = +v; r2(); });
+  group($('#s2h2'), SIZES, state.h2, (v) => { state.h2 = +v; r2(); });
+  function r2() {
+    const { B, h1, h2 } = state;
+    const L = [
+      { n: 'Flatten', out: [784], p: 0, f: 'réorganise, ne calcule rien' },
+      { n: `Linear(784, ${h1})`, out: [h1], p: 784 * h1 + h1, f: `784 × ${h1} + ${h1}` },
+      { n: 'ReLU', out: [h1], p: 0, f: 'aucun paramètre' },
+      { n: `Linear(${h1}, ${h2})`, out: [h2], p: h1 * h2 + h2, f: `${h1} × ${h2} + ${h2}` },
+      { n: 'ReLU', out: [h2], p: 0, f: 'aucun paramètre' },
+      { n: `Linear(${h2}, 10)`, out: [10], p: h2 * 10 + 10, f: `${h2} × 10 + 10` },
+    ];
+    const total = sum(L.map((l) => l.p)), weights = 784 * h1 + h1 * h2 + h2 * 10;
+    $('#s2tbl').innerHTML = '<tr><th>couche</th><th>forme de sortie</th><th>paramètres</th><th>calcul</th></tr>'
+      + `<tr><td class="muted">entrée</td><td class="num">(${B}, 1, 28, 28)</td><td class="num">0</td><td class="muted">les images du lot</td></tr>`
+      + L.map((l) => `<tr><td><code>${l.n}</code></td><td class="num">(${B}, ${l.out.join(', ')})</td><td class="num">${nf(l.p)}</td><td class="muted">${l.f}</td></tr>`).join('')
+      + `<tr><th>total</th><th class="num">(${B}, 10)</th><th class="num">${nf(total)}</th><th class="muted">dont ${nf(weights)} poids et ${nf(total - weights)} biais</th></tr>`;
+    $('#s2bars').innerHTML = L.filter((l) => l.p).map((l) => `<div class="brow"><span class="muted">${esc(l.n)}</span><div class="bar"><span style="width:${(100 * l.p / total).toFixed(1)}%"></span></div><span>${pct(l.p / total)} des paramètres</span></div>`).join('');
+    let chk = '';
+    if (D) {
+      const real = h1 === 256 && h2 === 128 ? D.arch.total : (D.paramsGrid.find((g) => g.h1 === h1 && g.h2 === h2) || {}).total;
+      chk = real === undefined ? 'Cette combinaison n\'a pas été construite par le script d\'export : la formule de la page n\'est pas vérifiée ici.'
+        : real === total ? `Vérifié : un vrai <code>nn.Sequential</code> de PyTorch avec ces tailles compte ${nf(real)} paramètres, comme la formule.` : `Écart avec PyTorch : ${nf(real)} (anomalie).`;
+    }
+    $('#s2check').innerHTML = chk;
+  }
+
+  /* ================= Section 3 : ReLU ================= */
+  const c3 = $('#c3'), g3 = c3.getContext('2d');
+  const s3sl = ['w1', 'b1', 'w2', 'b2'];
+  s3sl.forEach((k) => $('#s3' + k).addEventListener('input', (e) => { state[k] = +e.target.value; r3(); }));
+  $('#s3relu').addEventListener('change', (e) => { state.relu = e.target.checked; r3(); });
+  function plotAxes(g, w, h, xr, yr, l, r, t, b, ticksX, ticksY) {
+    g.strokeStyle = css('--line'); g.fillStyle = css('--muted'); g.font = '11px ui-monospace, Menlo, monospace'; g.lineWidth = 1;
+    const X = (x) => l + (x - xr[0]) / (xr[1] - xr[0]) * (w - l - r), Y = (y) => h - b - (y - yr[0]) / (yr[1] - yr[0]) * (h - t - b);
+    ticksX.forEach((v) => { g.beginPath(); g.moveTo(X(v), t); g.lineTo(X(v), h - b); g.stroke(); g.textAlign = 'center'; g.fillText(String(v).replace('.', ','), X(v), h - b + 14); });
+    ticksY.forEach((v) => { g.beginPath(); g.moveTo(l, Y(v)); g.lineTo(w - r, Y(v)); g.stroke(); g.textAlign = 'right'; g.fillText(String(v).replace('.', ','), l - 6, Y(v) + 4); });
+    return { X, Y };
+  }
+  function r3() {
+    s3sl.forEach((k) => { const o = $('#s3' + k).nextElementSibling; o.textContent = fr(state[k], 1); });
+    const { w1, b1, w2, b2, relu: on } = state, g = g3, w = 640, h = 300;
+    g.clearRect(0, 0, w, h);
+    const { X, Y } = plotAxes(g, w, h, [-3, 3], [-6, 6], 44, 12, 14, 26, [-3, -2, -1, 0, 1, 2, 3], [-6, -3, 0, 3, 6]);
+    const f = (x, act) => w2 * (act ? Math.max(0, w1 * x + b1) : w1 * x + b1) + b2;
+    const draw = (act, color, dash, width) => { g.strokeStyle = color; g.lineWidth = width; g.setLineDash(dash); g.beginPath(); for (let k = 0; k <= 300; k++) { const x = -3 + 6 * k / 300, y = Math.max(-6, Math.min(6, f(x, act))); if (k) g.lineTo(X(x), Y(y)); else g.moveTo(X(x), Y(y)); } g.stroke(); g.setLineDash([]); };
+    if (on) draw(false, css('--muted'), [6, 5], 1.5);
+    draw(on, css('--accent'), [], 3);
+    g.fillStyle = css('--muted'); g.textAlign = 'left'; g.fillText(on ? 'orange : avec ReLU ; gris pointillé : sans ReLU (une seule droite)' : 'sans ReLU : toujours une droite', 52, 24);
+    const slope = w2 * w1, icpt = w2 * b1 + b2;
+    $('#s3form').innerHTML = on
+      ? `f(x) = w2 × ReLU(w1 × x + b1) + b2<br>coude en x = −b1 / w1 = ${w1 === 0 ? 'aucun (w1 = 0)' : fr(-b1 / w1, 2)} ; sans ReLU on aurait la droite ${fr(slope, 2)} × x ${sg(icpt)}`
+      : `f(x) = w2 × (w1 × x + b1) + b2 = (w2 × w1) × x + (w2 × b1 + b2) = ${fr(slope, 2)} × x ${sg(icpt)}<br>deux couches, mais une seule droite : la pente est le produit w2 × w1.`;
+  }
+  const heat = (cv, a, wd, ht) => {
+    const g = cv.getContext('2d'), im = g.createImageData(wd, ht), mx = Math.max(1e-9, ...a);
+    const rgb = css('--accent'); const m = /#(..)(..)(..)/.exec(rgb) || [0, 'ff', '92', '2b'];
+    const col = [parseInt(m[1], 16), parseInt(m[2], 16), parseInt(m[3], 16)];
+    for (let i = 0; i < wd * ht; i++) { const t = Math.min(1, a[i] / mx); im.data[4 * i] = 20 + t * (col[0] - 20); im.data[4 * i + 1] = 22 + t * (col[1] - 22); im.data[4 * i + 2] = 26 + t * (col[2] - 26); im.data[4 * i + 3] = 255; }
+    g.putImageData(im, 0, 0);
+  };
+  function r3b() {
+    if (!state.fw) return;
+    const { a1, a2, z1, z2 } = state.fw;
+    heat($('#c3a'), a1, 16, 16); heat($('#c3b'), a2, 16, 8);
+    const n1 = a1.filter((v) => v === 0).length, n2 = a2.filter((v) => v === 0).length;
+    $('#s3stats').innerHTML = `<div class="stat"><b>${n1} / 256</b><span>unités à 0 en couche 1 (ReLU)</span></div><div class="stat"><b>${n2} / 128</b><span>unités à 0 en couche 2</span></div><div class="stat"><b>${fr(Math.max(...z1) , 2)}</b><span>plus grande valeur avant ReLU (couche 1)</span></div>`;
+    $('#s3check').innerHTML = D ? `Contrôle : ce moteur JavaScript refait la passe avant du vrai MLP avec ses poids exportés ; sur l'entrée de référence du script d'export, l'écart avec les logits de PyTorch est ${sci(refDiff)}.` : '';
+  }
+  let refDiff = NaN;
+  if (W) { const out = forward(dec(D.init.refInput)).logits; refDiff = Math.max(...out.map((v, i) => Math.abs(v - D.init.refLogits[i]))); }
+
+  /* ================= Section 4 : logits, softmax, loss ================= */
+  const s4sl = $('#s4sl');
+  s4sl.innerHTML = classes.map((n, i) => `<div class="sl" style="grid-template-columns:96px 1fr 52px"><span class="muted">${esc(n)}</span><input type="range" min="-5" max="5" step="0.01" value="0" data-i="${i}" aria-label="logit ${esc(n)}"><output></output></div>`).join('');
+  s4sl.addEventListener('input', (e) => { const i = e.target.dataset.i; if (i === undefined) return; state.logits[+i] = +e.target.value; r4(); });
+  group($('#s4cls'), classes.map((_, i) => i), state.y, (v) => { state.y = +v; r4(); }, (i) => `${i} ${esc(classes[i])}`);
+  const setLogits = (arr) => { state.logits = arr.map((v) => Math.max(-5, Math.min(5, Math.round(v * 100) / 100))); r4(); };
+  [['Tous à 0', () => setLogits(new Array(10).fill(0))],
+    ['Vraie classe à +2, le reste à 0', () => setLogits(classes.map((_, i) => (i === state.y ? 2 : 0)))],
+    ['Une autre classe domine (+4)', () => setLogits(classes.map((_, i) => (i === (state.y + 1) % 10 ? 4 : 0)))],
+    ['Logits de ton dessin', () => state.fw && setLogits(Array.from(state.fw.logits))]].forEach(([t, fn], k) => {
+    const b = document.createElement('button'); b.textContent = t; b.addEventListener('click', fn); $('#s4pre').appendChild(b);
+  });
+  $('#s4dsm').addEventListener('change', (e) => { state.dsm = e.target.checked; r4(); });
+  function r4() {
+    const z = state.logits, y = state.y, p = softmax(z), loss = crossEntropy(z, y), pred = p.indexOf(Math.max(...p));
+    s4sl.querySelectorAll('input').forEach((el, i) => { el.value = z[i]; el.nextElementSibling.textContent = fr(z[i], 2); });
+    $('#s4out').innerHTML = classes.map((n, i) => {
+      const g = p[i] - (i === y ? 1 : 0);
+      return `<div class="brow${i === y ? ' truth' : ''}"><span>${esc(n)}${i === y ? ' (vraie)' : ''}</span><div class="bar"><span style="width:${(100 * p[i]).toFixed(1)}%"></span></div><span>p = ${fr(p[i], 3)} ; ∂loss/∂logit = ${fr(g, 3)}</span></div>`;
+    }).join('');
+    const bad = crossEntropy(p, y);
+    $('#s4stats').innerHTML = `<div class="stat"><b>${fr(loss, 4)}</b><span>loss = −ln(p<sub>y</sub>), ce que calcule CrossEntropyLoss</span></div>`
+      + (state.dsm ? `<div class="stat"><b class="bad">${fr(bad, 4)}</b><span>loss si on lui donne le softmax en entrée (piège)</span></div>` : '')
+      + `<div class="stat"><b>${esc(classes[pred])}</b><span>classe prédite (argmax) ; la même avec ou sans softmax</span></div><div class="stat"><b>${fr(Math.LN10, 4)}</b><span>repère : ln 10, logits tous égaux</span></div>`;
+    $('#s4msg').innerHTML = state.dsm
+      ? `<div class="warn">Un <code>softmax</code> avant <code>CrossEntropyLoss</code> est appliqué deux fois : la loss passe de ${fr(loss, 4)} à ${fr(bad, 4)} sans aucune erreur. La somme des gradients reste nulle, mais ils ne sont plus ceux de la vraie loss.</div>`
+      : `<div class="muted">Somme des ∂loss/∂logit = ${fr(sum(p.map((v, i) => v - (i === y ? 1 : 0))), 3)} : le gradient de la cross-entropy par rapport aux logits est simplement <code>p − (1 pour la vraie classe, 0 ailleurs)</code>.</div>`;
+  }
+  function checkCe() {
+    if (!D) return;
+    let m = 0;
+    D.ce.forEach((c) => { const p = softmax(c.logits); m = Math.max(m, Math.abs(crossEntropy(c.logits, c.y) - c.loss), Math.abs(crossEntropy(p, c.y) - c.lossOnProbs), ...p.map((v, i) => Math.abs(v - c.probs[i])), ...p.map((v, i) => Math.abs(v - (i === c.y ? 1 : 0) - c.grad[i]))); });
+    $('#s4check').innerHTML = `Contrôle : sur ${D.ce.length} cas calculés par PyTorch (probabilités, loss, loss sur des probabilités, gradient), l'écart maximal avec ce moteur est ${sci(m)}.`;
+  }
+
+  /* ================= Section 5 : DataLoader ================= */
+  const hue = (b) => `hsl(${(b * 67) % 360} 70% 72%)`;
+  group($('#s5B'), [2, 4, 5, 10], state.s5B, (v) => { state.s5B = +v; r5(); });
+  group($('#s5seed'), ['0', '1', '2', '3', '4'], state.s5seed, (v) => { state.s5seed = v; r5(); });
+  $('#s5shuf').addEventListener('change', (e) => { state.s5shuf = e.target.checked; r5(); });
+  const batchesRow = (label, order, B) => {
+    const bs = []; for (let i = 0; i < order.length; i += B) bs.push(order.slice(i, i + B));
+    return `<div class="lrow"><span class="muted">${label}</span><span class="bs">${bs.map((b, k) => `<span class="bt">${b.map((v) => `<span class="sq${state.s5hl === v ? ' hl' : ''}" data-i="${v}" style="background:${hue(k)}">${v}</span>`).join('')}</span>`).join('')}</span></div>`;
+  };
+  function r5() {
+    if (!D) return;
+    const B = state.s5B, tr = state.s5shuf ? D.loader.shuffled[state.s5seed] : D.loader.sequential;
+    $('#s5rows').innerHTML = '<h4>train_loader</h4>' + tr.map((o, e) => batchesRow('époque ' + (e + 1), o, B)).join('') + '<h4>val_loader (shuffle=False)</h4>' + D.loader.sequential.map((o, e) => batchesRow('époque ' + (e + 1), o, B)).join('');
+    $('#s5note').textContent = `Chaque cadre est un lot de ${B} éléments (couleur = numéro du lot), chaque case est l'indice d'un exemple parmi ${D.loader.n}. Ordres réels d'un DataLoader PyTorch (torch.manual_seed(${state.s5seed}) avant la 1re époque) ; le découpage en lots est le même quelle que soit la taille de lot (vérifié pour les tailles 2, 4, 5 et 10 : ${D.loader.orderIndependentOfBatchSize ? 'oui' : 'non'}).`;
+  }
+  $('#s5rows').addEventListener('click', (e) => { const s = e.target.closest('.sq'); if (!s) return; const v = +s.dataset.i; state.s5hl = state.s5hl === v ? null : v; r5(); });
+  group($('#s5real'), [16, 32, 64, 128, 256, 512], state.s5real, (v) => { state.s5real = +v; r5b(); });
+  function r5b() {
+    if (!D) return;
+    const B = state.s5real, t = D.batchCounts.train[B], v = D.batchCounts.val, calc = Math.ceil(D.batchCounts.nTrain / B);
+    $('#s5realout').innerHTML = `<div class="stats"><div class="stat"><b>${nf(t.batches)}</b><span>lots par époque (train)</span></div><div class="stat"><b>${t.last}</b><span>taille du dernier lot</span></div></div>`
+      + `<p class="muted">${nf(D.batchCounts.nTrain)} = ${t.batches - 1} × ${B} + ${t.last}. Formule : ceil(${nf(D.batchCounts.nTrain)} / ${B}) = ${calc} ${calc === t.batches ? '(identique au vrai <code>len(DataLoader)</code>)' : '(anomalie)'}.</p>`
+      + `<p class="muted">Validation : lots de ${D.batchCounts.evalBatch} (<code>EVAL_BATCH</code>), donc ${v.batches} lots dont le dernier de ${v.last}.</p>`;
+  }
+  group($('#s5ms'), ['0', '1', '2'], state.s5ms, (v) => { state.s5ms = v; r5c(); });
+  group($('#s5ss'), ['1234', '1235'], state.s5ss, (v) => { state.s5ss = v; r5c(); }, (v) => (v === '1234' ? '1234 (celui du code)' : '1235 (essai)'));
+  function r5c() {
+    if (!D) return;
+    const head = state.s5ss === '1234' ? D.split.valHead : D.split.valHeadOtherSplitSeed;
+    $('#s5splitout').innerHTML = `<div class="split"><span style="width:${(100 * D.split.nTrain / 60000).toFixed(1)}%">train ${nf(D.split.nTrain)}</span><span class="val" style="width:${(100 * D.split.nVal / 60000).toFixed(1)}%">val</span></div>`
+      + `<p>Les 8 premières images de validation : <code>${head.join(', ')}</code></p>`
+      + `<p class="muted">${state.s5ss === '1234' ? `La liste est la même pour <code>--seed</code> 0, 1 et 2 (vérifié : ${D.split.sameValForModelSeeds ? 'oui' : 'non'}) : <code>split_indices</code> utilise son propre générateur.` : 'Changer <code>SPLIT_SEED</code> change le jeu de validation : toutes les mesures deviendraient incomparables avec les précédentes.'}</p>`
+      + `<p class="muted">Train et val sont disjoints : ${D.split.disjoint ? 'oui' : 'non'} ; à eux deux ils couvrent les ${nf(60000)} images : ${D.split.coversAll ? 'oui' : 'non'}.</p>`;
+  }
+
+  /* ================= Section 6 : la boucle (entraînements synthétiques réels) ================= */
+  group($('#s6ds'), ['random', 'rule'], state.s6ds, (v) => { state.s6ds = v; r6(); }, (v) => (v === 'random' ? 'étiquettes aléatoires' : 'étiquettes liées à l\'image'));
+  group($('#s6lr'), ['0.0001', '0.001', '0.01', '0.1'], state.s6lr, (v) => { state.s6lr = v; state.s6nz = false; $('#s6nz').checked = false; r6(); }, (v) => fr(+v, 4).replace(/0+$/, '').replace(/,$/, ''));
+  $('#s6nz').addEventListener('change', (e) => { state.s6nz = e.target.checked; r6(); });
+  $('#s6ep').addEventListener('input', (e) => { stop6(); state.s6e = +e.target.value; r6(); });
+  let timer = 0;
+  const stop6 = () => { if (timer) { clearInterval(timer); timer = 0; $('#s6play').textContent = 'Animer'; } };
+  $('#s6play').addEventListener('click', () => {
+    if (timer) { stop6(); return; }
+    if (state.s6e >= 30) state.s6e = 0;
+    $('#s6play').textContent = 'Pause';
+    timer = setInterval(() => { state.s6e += 1; r6(); if (state.s6e >= 30) stop6(); }, 300);
+  });
+  $('#s6reset').addEventListener('click', () => { stop6(); state.s6e = 0; r6(); });
+  const run6 = () => D && D.train.datasets[state.s6ds].runs[state.s6nz ? '0.001-nozero' : state.s6lr];
+  function line(g, xs, ys, X, Y, color, width, dash) {
+    g.strokeStyle = color; g.lineWidth = width; g.setLineDash(dash || []); g.beginPath();
+    xs.forEach((x, k) => { const px = X(x), py = Y(ys[k]); if (k) g.lineTo(px, py); else g.moveTo(px, py); }); g.stroke(); g.setLineDash([]);
+  }
+  function r6() {
+    const run = run6(); if (!run) return;
+    const e = state.s6e;
+    $('#s6epo').textContent = `${e} / 30`; $('#s6ep').value = e;
+    if (state.s6nz) { document.querySelectorAll('#s6lr button').forEach((b) => b.classList.remove('on')); }
+    else document.querySelectorAll('#s6lr button').forEach((b) => b.classList.toggle('on', b.dataset.v === state.s6lr));
+    // courbe de loss (échelle logarithmique)
+    let g = $('#c6a').getContext('2d'), w = 640, h = 280;
+    g.clearRect(0, 0, w, h);
+    const ly = (v) => Math.log10(Math.max(v, 1e-5)), yr = [-5, 1.5], l = 56, rr = 12, t = 14, b = 30;
+    const X = (x) => l + x / 30 * (w - l - rr), Y = (v) => h - b - (ly(v) - yr[0]) / (yr[1] - yr[0]) * (h - t - b);
+    g.strokeStyle = css('--line'); g.fillStyle = css('--muted'); g.font = '11px ui-monospace, Menlo, monospace'; g.lineWidth = 1;
+    [-4, -3, -2, -1, 0, 1].forEach((p) => { const y = Y(Math.pow(10, p)); g.beginPath(); g.moveTo(l, y); g.lineTo(w - rr, y); g.stroke(); g.textAlign = 'right'; g.fillText('1e' + p, l - 6, y + 4); });
+    [0, 5, 10, 15, 20, 25, 30].forEach((x) => { g.textAlign = 'center'; g.fillText(String(x), X(x), h - b + 14); });
+    g.textAlign = 'center'; g.fillText('époques', (l + w - rr) / 2, h - 4);
+    g.setLineDash([4, 4]); g.strokeStyle = css('--muted'); g.beginPath(); g.moveTo(l, Y(Math.LN10)); g.lineTo(w - rr, Y(Math.LN10)); g.stroke(); g.setLineDash([]);
+    const ex = Array.from({ length: e }, (_, k) => k + 1), e0 = Array.from({ length: e + 1 }, (_, k) => k);
+    if (e >= 1) line(g, ex, run.trainLoss.slice(0, e), X, Y, css('--accent'), 3);
+    line(g, e0, run.heldLoss.slice(0, e + 1), X, Y, css('--hl'), 3);
+    // précision
+    g = $('#c6b').getContext('2d'); h = 220;
+    g.clearRect(0, 0, w, h);
+    const Y2 = (v) => h - b - v * (h - t - b);
+    g.strokeStyle = css('--line'); g.fillStyle = css('--muted'); g.lineWidth = 1;
+    [0, .25, .5, .75, 1].forEach((v) => { g.beginPath(); g.moveTo(l, Y2(v)); g.lineTo(w - rr, Y2(v)); g.stroke(); g.textAlign = 'right'; g.fillText(Math.round(v * 100) + ' %', l - 6, Y2(v) + 4); });
+    [0, 5, 10, 15, 20, 25, 30].forEach((x) => { g.textAlign = 'center'; g.fillText(String(x), X(x), h - b + 14); });
+    g.setLineDash([4, 4]); g.beginPath(); g.moveTo(l, Y2(.1)); g.lineTo(w - rr, Y2(.1)); g.stroke(); g.setLineDash([]);
+    line(g, e0, run.evalTrainAcc.slice(0, e + 1), X, Y2, css('--accent'), 3);
+    line(g, e0, run.heldAcc.slice(0, e + 1), X, Y2, css('--hl'), 3);
+    const ds = D.train.datasets[state.s6ds];
+    $('#s6stats').innerHTML = `<div class="stat"><b>${num(run.evalTrainLoss[e], 4)}</b><span>loss sur les ${nf(ds.nTrain)} images d'entraînement</span></div>`
+      + `<div class="stat"><b>${pct(run.evalTrainAcc[e])}</b><span>précision sur ces images</span></div>`
+      + `<div class="stat"><b>${num(run.heldLoss[e], 3)}</b><span>loss sur ${ds.nHeld} images jamais vues</span></div>`
+      + `<div class="stat"><b>${pct(run.heldAcc[e])}</b><span>précision sur ces images</span></div>`;
+    let msg = '';
+    if (e === 0) msg = `Avant tout entraînement : la loss est proche de ln 10 = ${fr(Math.LN10, 4)} et la précision proche du hasard (10 %). Appuie sur « Animer ».`;
+    else {
+      const stuck = run.trainLoss[29] > 1.9, tr = run.evalTrainAcc[e], he = run.heldAcc[e];
+      if (e < 10) msg = `À l'époque ${e} : ${pct(tr)} sur l'entraînement, ${pct(he)} sur des images jamais vues.`;
+      else if (state.s6nz) msg = `Sans <code>optimizer.zero_grad()</code>, les gradients s'additionnent d'un lot à l'autre (étape 1) : à l'époque ${e}, la précision d'entraînement n'est que de ${pct(tr)}. Compare avec la même courbe, <code>zero_grad</code> présent (décoche la case).`;
+      else if (state.s6lr === '0.1' && stuck) msg = 'Avec lr = 0,1 la loss explose dès la 1re époque (de l\'ordre de 10 à 14 en moyenne) puis stagne vers 2,3, le niveau de départ : l\'entraînement n\'a pas décollé. La cause n\'est pas établie par cette page ; ce qui est mesuré : un lr 100 fois plus grand que celui du code ne converge pas ici.';
+      else if (tr >= 0.99 && state.s6ds === 'random') msg = `Précision d'entraînement ${pct(tr)}, mais ${pct(he)} sur des images jamais vues : le hasard ne se généralise pas (10 % = 1 classe sur 10). Le réseau a <b>mémorisé</b> ses exemples ; la validation le montre.`;
+      else if (tr >= 0.99) msg = `Précision d'entraînement ${pct(tr)} et ${pct(he)} sur des images jamais vues : une partie de la règle est apprise (bien plus que 10 %)` + (run.heldLoss[e] > Math.min(...run.heldLoss.slice(0, e + 1)) * 1.02 ? ', mais la loss sur les images jamais vues remonte depuis son minimum : c\'est du sur-apprentissage.' : ' ; la loss sur les images jamais vues baisse encore.');
+      else msg = `À l'époque ${e} : ${pct(tr)} sur l'entraînement, ${pct(he)} sur des images jamais vues.`;
+    }
+    $('#s6msg').innerHTML = msg ? `<div class="tip">${msg}</div>` : '';
+  }
+  ['wl1', 'wl2', 'wl3'].forEach((id) => $('#' + id).addEventListener('input', r6w));
+  function r6w() {
+    const l = ['wl1', 'wl2', 'wl3'].map((id) => Math.max(0, +$('#' + id).value || 0)), n = [4, 4, 2];
+    const naive = sum(l) / 3, weighted = sum(l.map((v, i) => v * n[i])) / sum(n);
+    $('#wout').innerHTML = `<div class="stats"><div class="stat"><b>${fr(weighted, 3)}</b><span>moyenne pondérée : (${l.map((v, i) => `${fr(v, 1)} × ${n[i]}`).join(' + ')}) / 10, comme le code</span></div><div class="stat"><b class="${Math.abs(naive - weighted) > 1e-9 ? 'bad' : ''}">${fr(naive, 3)}</b><span>moyenne des moyennes de lots (piège)</span></div></div>`
+      + `<p class="muted">Chaque exemple pèse pareil dans la vraie moyenne : un lot de 2 exemples ne doit pas compter autant qu'un lot de 4. Avec 55 000 images et lots de 128, le dernier lot n'a que 88 images : l'écart est faible, mais le calcul reste le bon.</p>`;
+  }
+
+  /* ================= Section 7 : train, eval, no_grad ================= */
+  group($('#s7model'), ['mlp', 'drop', 'bn'], state.s7model, (v) => { state.s7model = v; r7(); }, (v) => ({ mlp: 'MLP du palier', drop: 'MLP + Dropout (jouet)', bn: 'BatchNorm1d (réel)' }[v]));
+  group($('#s7p'), ['0.25', '0.5'], state.s7p, (v) => { state.s7p = v; state.s7draw = 0; r7(); });
+  const setBtns = (ids, on) => ids.forEach((id) => $(id).classList.toggle('on', id === on));
+  $('#s7train').addEventListener('click', () => { state.s7mode = 'train'; setBtns(['#s7train', '#s7eval'], '#s7train'); r7(); });
+  $('#s7eval').addEventListener('click', () => { state.s7mode = 'eval'; setBtns(['#s7train', '#s7eval'], '#s7eval'); r7(); });
+  $('#s7gon').addEventListener('click', () => { state.s7grad = 'on'; setBtns(['#s7gon', '#s7goff'], '#s7gon'); r7(); });
+  $('#s7goff').addEventListener('click', () => { state.s7grad = 'off'; setBtns(['#s7gon', '#s7goff'], '#s7goff'); r7(); });
+  $('#s7draw').addEventListener('click', () => { state.s7draw += 1; r7(); });
+  const cells = (arr) => `<div class="cells">${arr.map((v) => `<span class="cell${v === 0 ? ' zero' : ''}">${fr(v, 3)}</span>`).join('')}</div>`;
+  function r7() {
+    if (!D) return;
+    const m = D.modes, mod = state.s7model, train = state.s7mode === 'train';
+    $('#s7popt').hidden = mod !== 'drop';
+    let out = '';
+    if (mod === 'mlp') {
+      out = `<p>Même entrée, MLP en mode <code>${state.s7mode === 'train' ? 'train()' : 'eval()'}</code> : l'écart maximal avec l'autre mode, mesuré par PyTorch, est <b>${m.mlpMaxDiffTrainEval}</b>. Il n'y a aucune couche sensible au mode (Dropout ou BatchNorm présent dans le MLP : ${m.hasDropoutOrBatchNorm ? 'oui' : 'non'}).</p>`;
+    } else if (mod === 'drop') {
+      const p = +state.s7p, scale = 1 / (1 - p);
+      const real = m.dropout[state.s7p];
+      if (train) {
+        const draw = Array.from({ length: 10 }, () => (Math.random() < p ? 0 : scale));
+        out = `<p>Entrée : dix 1. <code>Dropout(${fr(p, 2)})</code> en <code>train()</code> : chaque unité est mise à 0 avec la probabilité ${fr(p, 2)}, les autres sont multipliées par 1 / (1 − p) = ${fr(scale, 3)} pour garder la moyenne.</p>${cells(draw)}<p class="muted">Tirage de la page (jouet JavaScript, numéro ${state.s7draw}). Trois tirages réels de <code>nn.Dropout(${fr(p, 2)})</code> :</p>${real.train.map(cells).join('')}`;
+      } else out = `<p>Entrée : dix 1. <code>Dropout(${fr(p, 2)})</code> en <code>eval()</code> ne fait rien : la sortie est l'entrée.</p>${cells(real.eval)}`;
+    } else {
+      const bn = m.batchNorm;
+      out = `<p>Lot de 4 valeurs en entrée : <code>${bn.input.join(', ')}</code>, passées dans un <code>nn.BatchNorm1d(1)</code> neuf.</p><p>${train ? '<code>train()</code> : normalisé avec la moyenne et la variance <b>du lot</b>' : '<code>eval()</code> : normalisé avec les statistiques <b>cumulées</b> (après un seul passage en train : moyenne ' + fr(bn.running.mean, 2) + ', variance ' + fr(bn.running.var, 2) + ')'}.</p>${cells(train ? bn.train : bn.eval)}<p class="muted">Valeurs réelles de PyTorch. Le même lot donne deux résultats différents selon le mode : c'est ce qui rendra l'oubli de <code>eval()</code> visible à partir de l'étape 3.</p>`;
+    }
+    $('#s7out').innerHTML = out;
+    const rg = state.s7grad === 'off' ? m.requiresGradNoGrad : (train ? m.requiresGradTrain : m.requiresGradEval);
+    $('#s7flags').innerHTML = `<div class="stats"><div class="stat"><b>${rg ? 'True' : 'False'}</b><span>out.requires_grad pour le MLP, mode ${train ? 'train()' : 'eval()'}, gradient ${state.s7grad === 'off' ? 'sous no_grad' : 'normal'}</span></div></div>`
+      + `<p class="muted">Mesuré sur le MLP : <code>requires_grad</code> vaut ${m.requiresGradTrain ? 'True' : 'False'} en <code>train()</code>, ${m.requiresGradEval ? 'True' : 'False'} en <code>eval()</code> (le mode ne coupe pas les gradients), ${m.requiresGradNoGrad ? 'True' : 'False'} sous <code>no_grad</code> (parmi ces trois cas, le seul qui coupe l'enregistrement du graphe).</p>`;
+  }
+
+  /* ================= Quiz ================= */
+  const QUIZ = [
+    { q: 'Pourquoi le modèle donne-t-il des logits, et non un softmax, à <code>CrossEntropyLoss</code> ?', trap: true, ref: '#s4',
+      o: [
+        { t: 'La loss applique déjà le softmax : en ajouter un deuxième la fausse', ok: true, why: 'Section 4 : la loss vaut −ln(p) avec p calculé en interne. Un softmax en plus ne lève aucune erreur, il change la valeur.' },
+        { t: 'Le softmax change la classe prédite : l\'argmax des logits serait faux', ok: false, why: 'Le softmax est croissant : l\'argmax est le même, avec ou sans lui. C\'est pourquoi l.66 prend l\'argmax des logits.' },
+        { t: 'C\'est un simple gain de temps : la valeur de la loss serait la même', ok: false, why: 'Faux : sur l\'exemple de la page, la loss passe de 0,7966 à 1,9593 quand le softmax est appliqué deux fois.' },
+        { t: 'Une probabilité ne peut pas être comparée à une étiquette entière', ok: false, why: 'La cible reste un entier de classe dans les deux cas. Le problème est la double application du softmax.' },
+      ] },
+
+    { q: 'Les 10 logits valent 0 sauf celui de la vraie classe, à +2. Que vaut la <code>CrossEntropyLoss</code> ?', ref: '#s4',
+      o: [
+        { t: '0,7966', ok: true, why: 'p = e² / (e² + 9) ≈ 0,4509 ; loss = −ln(0,4509) ≈ 0,7966 (valeur de PyTorch dans le contrôle de la page).' },
+        { t: '0,4509', ok: false, why: 'C\'est la probabilité p de la vraie classe, pas −ln(p).' },
+        { t: '1,9593', ok: false, why: 'C\'est la loss obtenue en appliquant le softmax deux fois : le piège de la section 4.' },
+        { t: '2,3026', ok: false, why: 'C\'est ln 10, la loss de dix logits égaux. Ici la vraie classe est favorisée, la loss est plus basse.' },
+      ] },
+
+    { q: 'Que fait <code>nn.Flatten()</code> sur un lot de forme <code>(B, 1, 28, 28)</code> ?', ref: '#s1',
+      o: [
+        { t: 'Il renvoie (B, 784) : chaque image devient un vecteur de 784 nombres', ok: true, why: 'Le pixel (r, c) devient l\'indice 28 r + c ; le lot n\'est pas touché (section 1).' },
+        { t: 'Il renvoie (B × 784,) : tout le lot devient un seul long vecteur', ok: false, why: 'Flatten garde la dimension du lot (start_dim = 1) : sinon on ne saurait plus séparer les images.' },
+        { t: 'Il renvoie (B, 1, 784) : seul le canal est conservé, en plus du lot', ok: false, why: 'Le canal est aplati avec les lignes et colonnes : 1 × 28 × 28 = 784 nombres par image.' },
+        { t: 'Il renvoie (784, B) : une image par colonne, comme une matrice de données', ok: false, why: 'PyTorch range le lot en première dimension : (B, 784), pas (784, B).' },
+      ] },
+
+    { q: 'Combien de paramètres compte <code>nn.Linear(256, 128)</code>, biais compris ?', ref: '#s2',
+      o: [
+        { t: '32 896', ok: true, why: '256 × 128 = 32 768 poids, plus 128 biais : 32 896. C\'est la 2e couche du MLP.' },
+        { t: '32 768', ok: false, why: 'Ce sont les poids seuls : le biais (un par sortie) a été oublié.' },
+        { t: '384', ok: false, why: 'C\'est 256 + 128 : on a additionné les tailles au lieu de multiplier entrées par sorties.' },
+        { t: '65 536', ok: false, why: 'C\'est 256 × 256 : la matrice n\'est pas carrée, ses dimensions sont 128 × 256.' },
+      ] },
+
+    { q: 'On retire les deux <code>ReLU</code> du MLP et on garde les trois <code>Linear</code>. Que devient le réseau ?', trap: true, ref: '#s3',
+      o: [
+        { t: 'Une seule transformation linéaire de l\'entrée, malgré ses trois couches', ok: true, why: 'W3 (W2 (W1 x + b1) + b2) + b3 se réécrit (W3 W2 W1) x + b. Pour deux couches, PyTorch mesure un écart de 1e-16 (section 3).' },
+        { t: 'Un réseau moins expressif, car il compterait moins de paramètres', ok: false, why: 'Les ReLU n\'ont aucun paramètre : le total reste 235 146. C\'est la forme de la fonction qui change.' },
+        { t: 'Un réseau qui ne peut plus calculer de gradient, car backward() a besoin des ReLU', ok: false, why: 'backward() fonctionne avec des couches Linear seules ; la perte de capacité est une affaire de forme, pas de graphe.' },
+        { t: 'Un réseau aussi expressif : les couches Linear suffisent à apprendre des courbes', ok: false, why: 'Une pile de Linear ne représente que des fonctions linéaires : sans ReLU, les courbes sont hors de portée (section 3).' },
+      ] },
+
+    { q: 'Que fait <code>DataLoader(shuffle=True)</code> à chaque époque ?', trap: true, ref: '#s5',
+      o: [
+        { t: 'Il tire une permutation de tous les exemples : la composition des lots change', ok: true, why: 'La page le montre : un même élément tombe dans des lots différents d\'une époque à l\'autre.' },
+        { t: 'Il garde les mêmes lots et change seulement l\'ordre dans lequel il les présente', ok: false, why: 'Idée fausse tentante : ce serait un mélange de lots figés. Ici ce sont tous les exemples qui sont redistribués.' },
+        { t: 'Il mélange une fois au premier passage, puis réutilise toujours cet ordre', ok: false, why: 'Les ordres réels de la page diffèrent à chaque époque : la permutation est retirée à chaque époque.' },
+        { t: 'Il permute les pixels de chaque image afin d\'éviter la mémorisation', ok: false, why: 'Les images ne sont pas modifiées : seul l\'ordre des exemples change.' },
+      ] },
+
+    { q: 'Pourquoi changer <code>--seed</code> ne change-t-il pas le jeu de validation ?', trap: true, ref: '#s5',
+      o: [
+        { t: 'La découpe est tirée avec sa propre graine, fixée une fois pour toutes', ok: true, why: 'split_indices crée son propre générateur (carte de la section 5) : la liste de validation est identique pour les graines 0, 1 et 2.' },
+        { t: 'Le jeu de validation est tiré avec la graine de l\'exécution, puis figé en mémoire', ok: false, why: 'Alors il changerait d\'une graine à l\'autre, ce que la page montre faux.' },
+        { t: 'Ce sont les 5 000 premières images du fichier, prises sans aucun tirage', ok: false, why: 'Il y a un tirage (permutation), mais avec une graine à part : c\'est ce qui le rend stable.' },
+        { t: 'Le loader de validation ne mélange pas, donc la graine ne peut pas l\'atteindre', ok: false, why: 'Confusion de deux notions : shuffle=False règle l\'ordre de passage, SPLIT_SEED règle le choix des images.' },
+      ] },
+
+    { q: 'Après 30 époques sur des images aux étiquettes tirées au hasard, la précision d\'entraînement atteint 100 %. Que conclure ?', trap: true, ref: '#s6',
+      o: [
+        { t: 'Le réseau a mémorisé ses exemples : la validation dira s\'il généralise', ok: true, why: 'Sur la page, la précision sur des images jamais vues reste proche de 10 % : le hasard ne se généralise pas.' },
+        { t: 'Le réseau a trouvé la règle cachée des étiquettes et généralisera bien', ok: false, why: 'Il n\'y a aucune règle dans des étiquettes aléatoires : 100 % sur l\'entraînement n\'a pas cette portée.' },
+        { t: 'L\'entraînement est buggé : des étiquettes aléatoires ne peuvent pas être apprises', ok: false, why: 'Elles peuvent être mémorisées, avec 235 146 paramètres pour 2 048 images. Ce n\'est pas un bug.' },
+        { t: 'La loss d\'entraînement ne sert à rien et il ne faut pas la suivre', ok: false, why: 'Elle sert à vérifier que l\'optimisation marche, mais elle ne mesure pas la généralisation.' },
+      ] },
+
+    { q: 'Trois lots de 4, 4 et 2 exemples ont une loss moyenne de 1, 1 et 4. Quelle loss moyenne <code>train_one_epoch</code> renvoie-t-il ?', ref: '#s6',
+      o: [
+        { t: '1,6', ok: true, why: '(1 × 4 + 1 × 4 + 4 × 2) / 10 = 16 / 10 : chaque exemple pèse pareil (l.52 et l.54).' },
+        { t: '2,0', ok: false, why: 'C\'est la moyenne simple des trois lots, qui donne trop de poids au petit lot de 2.' },
+        { t: '6,0', ok: false, why: 'C\'est la somme des trois pertes de lot, sans division.' },
+        { t: '1,0', ok: false, why: 'C\'est la loss du premier lot seulement : les autres ne sont pas pris en compte.' },
+      ] },
+
+    { q: 'Pour ce MLP, lesquelles de ces affirmations sont vraies ?', multi: true, trap: true, ref: '#s7',
+      o: [
+        { t: 'model.train() et model.eval() donnent exactement les mêmes sorties', ok: true, why: 'Aucune couche sensible au mode : l\'écart mesuré par PyTorch est 0 (section 7).' },
+        { t: 'Le décorateur @torch.no_grad() évite d\'enregistrer le graphe dans evaluate', ok: true, why: 'C\'est lui qui coupe l\'enregistrement : requires_grad vaut False sous no_grad.' },
+        { t: 'model.eval() coupe aussi le calcul des gradients, comme no_grad', ok: false, why: 'Deux interrupteurs : en eval(), requires_grad vaut encore True. C\'est no_grad qui coupe l\'enregistrement.' },
+        { t: 'Appeler model.eval() ne sert à rien, même quand un Dropout ou BatchNorm est ajouté', ok: false, why: 'Sans effet ici, mais l\'oublier fausse l\'évaluation dès qu\'un Dropout ou un BatchNorm apparaît (étape 3).' },
+      ] },
+  ];
+  // La bonne réponse est écrite en premier ci-dessus : on tourne les propositions (ordre fixe, reproductible) pour varier sa position.
+  QUIZ.forEach((x, qi) => { const k = (qi * 3 + 1) % x.o.length; x.o = x.o.slice(k).concat(x.o.slice(0, k)); });
+  const quizState = QUIZ.map(() => null);
+  const quizBox = $('#quizBox');
+  const MISSED_KEY = 's02_quiz_missed';
+  const loadMissed = () => { try { return JSON.parse(localStorage.getItem(MISSED_KEY) || '[]'); } catch (e) { return []; } };
+  const saveMissed = (m) => { try { localStorage.setItem(MISSED_KEY, JSON.stringify(m)); } catch (e) { /* stockage indisponible : le quiz marche quand même */ } };
+  const shuffle = (a) => { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
+  let order = QUIZ.map((_, i) => i);   // indices (dans QUIZ) des questions affichées, dans l'ordre d'affichage
+  const hintOf = (x) => (x.multi ? 'Coche toutes les bonnes réponses.' : 'Une seule bonne réponse.');
+  function renderQuiz() {
+    quizBox.innerHTML = '<div class="quiz-head"><span class="score" id="qscore"></span><span class="row"><button id="qreset">↺ Recommencer</button><button id="qshuf">⇄ Mélanger</button><button id="qmiss"></button><button id="qall">Toutes les questions</button></span></div>'
+      + order.map((qi, pos) => { const x = QUIZ[qi]; return `<div class="q" data-q="${qi}">
+        <p class="qt"><span class="tag ${x.trap ? 'trap' : ''}">${x.trap ? 'Piège' : 'Question ' + (pos + 1)}</span>${x.multi ? '<span class="tag multi">Plusieurs réponses</span>' : ''}${x.q}</p>
+        <p class="hint">${hintOf(x)}</p>
+        ${x.o.map((o, oi) => `<label class="opt" data-o="${oi}"><input type="${x.multi ? 'checkbox' : 'radio'}" name="q${qi}"><span class="ot">${o.t}<span class="why">${o.ok ? '✓ Vrai. ' : '✗ Faux. '}${o.why}</span></span></label>`).join('')}
+        <div class="row"><button class="check on">Valider</button></div>
+        <div class="explain"><p class="res"></p>${x.ref ? `<p class="muted">À relire : <a href="${x.ref}">${x.ref}</a></p>` : ''}</div>
+      </div>`; }).join('');
+    updateScore(); updateMissedBtn();
+  }
+  function updateMissedBtn() {
+    const n = QUIZ.filter((x) => loadMissed().includes(x.q)).length, b = $('#qmiss');
+    b.textContent = `Refaire les ratées (${n})`; b.disabled = n === 0;
+    $('#qall').hidden = order.length === QUIZ.length;
+  }
+  function updateScore() {
+    const done = order.filter((qi) => quizState[qi]), right = done.filter((qi) => quizState[qi].right).length;
+    $('#qscore').textContent = `Score : ${right} / ${order.length}` + (done.length < order.length ? ` (${done.length} répondue${done.length > 1 ? 's' : ''})` : ' : terminé');
+  }
+  quizBox.addEventListener('click', (e) => {
+    if (e.target.id === 'qreset') { quizState.fill(null); renderQuiz(); return; }
+    if (e.target.id === 'qshuf') { shuffle(order); order.forEach((qi) => shuffle(QUIZ[qi].o)); quizState.fill(null); renderQuiz(); return; }
+    if (e.target.id === 'qmiss') { const m = loadMissed(); order = QUIZ.map((_, i) => i).filter((i) => m.includes(QUIZ[i].q)); quizState.fill(null); renderQuiz(); return; }
+    if (e.target.id === 'qall') { order = QUIZ.map((_, i) => i); quizState.fill(null); renderQuiz(); return; }
+    const btn = e.target.closest('button.check'); if (!btn) return;
+    const box = btn.closest('.q'), qi = +box.dataset.q, x = QUIZ[qi];
+    if (quizState[qi]) return;
+    const picked = [...box.querySelectorAll('.opt')].map((l) => l.querySelector('input').checked);
+    if (!picked.some(Boolean)) { box.querySelector('.hint').textContent = 'Choisis au moins une réponse.'; return; }
+    box.querySelector('.hint').textContent = hintOf(x);
+    let nbOk = 0, nbBad = 0;
+    box.querySelectorAll('.opt').forEach((l, oi) => {
+      const ok = x.o[oi].ok, sel = picked[oi];
+      l.classList.add(ok && sel ? 'good' : !ok && sel ? 'wrong' : ok ? 'miss' : 'neutral');
+      if (ok && sel) nbOk++;
+      if (!ok && sel) nbBad++;
+      l.querySelector('input').disabled = true;
+    });
+    const total = x.o.filter((o) => o.ok).length, right = nbOk === total && nbBad === 0;
+    quizState[qi] = { right };
+    const res = box.querySelector('.res');
+    res.className = 'res ' + (right ? 'ok' : nbOk > 0 && nbBad === 0 ? 'part' : 'ko');
+    res.textContent = right ? 'Correct.' : nbOk > 0 && nbBad === 0 ? `Incomplet : tu as trouvé ${nbOk} bonne(s) réponse(s) sur ${total}.` : 'Pas tout à fait.';
+    box.classList.add('done'); btn.disabled = true;
+    saveMissed(loadMissed().filter((t) => t !== x.q).concat(right ? [] : [x.q]));
+    updateScore(); updateMissedBtn();
+  });
+  renderQuiz();
+
+
+  /* ================= Prédire avant de voir ================= */
+  const PRED = [
+    { id: 'p2', target: '#s2 > .card', q: 'Le MLP du palier enchaîne Linear(784, 256), ReLU, Linear(256, 128), ReLU, Linear(128, 10). Combien de paramètres entraînables compte-t-il ?',
+      o: ['234 752 : les poids des trois couches, sans les biais', '235 146 : les poids et les biais des trois couches', '200 960 : la première couche, qui contient presque tout', '1 178 : un paramètre par neurone, soit 784 + 256 + 128 + 10'], ok: 1,
+      reveal: () => `Réponse : ${D ? nf(D.arch.total) : '235 146'}, soit ${D ? D.arch.layers.filter((l) => l.params).map((l) => nf(l.params)).join(' + ') : '200 960 + 32 896 + 1 290'}. Chaque couche compte entrées × sorties + sorties (le biais). Les ReLU n'ont aucun paramètre. Explore les tailles dans la zone ci-dessous.` },
+    { id: 'p4', target: '#s4 > .card', q: 'Les 10 logits valent tous 0 : le réseau n\'a aucune préférence. Que vaut la <code>CrossEntropyLoss</code> ?',
+      o: ['0, car aucune classe n\'est favorisée', '1, la valeur d\'une probabilité certaine', 'environ 2,30, soit ln 10', '10, une unité par classe possible'], ok: 2,
+      reveal: () => `Réponse : ${D ? fr(D.ce[0].loss, 4) : '2,3026'} = ln 10. Les dix probabilités valent 0,1 et la loss est −ln(0,1). C'est la valeur de départ attendue d'un entraînement à 10 classes : un repère pour vérifier un premier pas. Vérifie avec « Tous à 0 » ci-dessous.` },
+    { id: 'p6', target: '#s6 > .card', q: 'On entraîne le MLP avec Adam (lr = 0,001, lots de 64) pendant 30 époques sur 2 048 images dont les étiquettes sont tirées au hasard. Que fait la loss d\'entraînement ?',
+      o: ['Elle reste autour de 2,30 : il n\'y a rien à apprendre', 'Elle tombe presque à 0 : le réseau mémorise les images', 'Elle baisse un peu puis remonte à partir de l\'époque 5', 'Elle devient négative après quelques époques'], ok: 1,
+      reveal: () => { const r = D && D.train.datasets.random.runs['0.001']; return `Réponse : elle tombe presque à 0. Mesure du script d'export (lr = 0,001) : de ${r ? fr(r.evalTrainLoss[0], 3) : '2,306'} avant entraînement à ${r ? sci(r.trainLoss[29]) : '4,50e-4'} (moyenne de la dernière époque), avec ${r ? pct(r.evalTrainAcc[30]) : '100 %'} de précision sur ces images, et ${r ? pct(r.heldAcc[30]) : '8,6 %'} sur des images jamais vues. Lance l'animation pour le voir.`; } },
+    { id: 'p7', target: '#s7 > .card', q: 'On donne la même entrée au MLP du palier en mode <code>train()</code>, puis en mode <code>eval()</code>. Les sorties sont...',
+      o: ['identiques, exactement, au bit près', 'très proches, avec un léger bruit numérique', 'très différentes, comme avec un Dropout', 'identiques seulement si le lot contient une image'], ok: 0,
+      reveal: () => `Réponse : identiques. L'écart maximal mesuré par PyTorch vaut ${D ? D.modes.mlpMaxDiffTrainEval : 0} : le MLP n'a ni Dropout ni BatchNorm, les couches classiques dont le comportement dépend du mode. Bascule les interrupteurs ci-dessous, puis compare avec les deux autres modèles.` },
+  ];
+  PRED.forEach((p) => {
+    const target = $(p.target); if (!target) return;
+    const box = document.createElement('div'); box.className = 'predict'; box.id = p.id;
+    box.innerHTML = `<h4>Prédis d'abord</h4><p>${p.q}</p>` + p.o.map((t, i) => `<label class="opt" data-o="${i}"><input type="radio" name="${p.id}"><span class="ot">${t}</span></label>`).join('')
+      + '<div class="row"><button class="on pv">Valider ma prédiction</button><button class="skip">Passer, je veux juste explorer</button></div><p class="muted pmsg"></p><div class="tip pres" hidden></div>';
+    target.before(box);
+    target.classList.add('locked'); target.setAttribute('inert', '');
+    const unlock = () => { target.classList.remove('locked'); target.removeAttribute('inert'); box.querySelectorAll('input,button').forEach((b) => { b.disabled = true; }); };
+    box.querySelector('.skip').addEventListener('click', unlock);
+    box.querySelector('.pv').addEventListener('click', () => {
+      const idx = [...box.querySelectorAll('input')].findIndex((i) => i.checked);
+      if (idx < 0) { box.querySelector('.pmsg').textContent = 'Choisis une réponse, ou passe.'; return; }
+      box.querySelectorAll('.opt').forEach((l, i) => l.classList.add(i === p.ok ? (i === idx ? 'good' : 'miss') : i === idx ? 'wrong' : 'neutral'));
+      const pres = box.querySelector('.pres'); pres.hidden = false;
+      pres.innerHTML = `<b>${idx === p.ok ? 'Bien vu.' : 'Pas tout à fait : tu avais prédit autre chose.'}</b> ${p.reveal()}`;
+      box.querySelector('.pmsg').textContent = '';
+      unlock();
+    });
+  });
+
+  /* ================= Explique avec tes mots ================= */
+  const PORTE = [
+    { q: 'Que fait <code>DataLoader(shuffle=True)</code> à chaque époque, et pourquoi le loader de validation ne mélange-t-il pas ?',
+      pts: ['À chaque époque, il tire une <b>nouvelle permutation de tous les exemples</b> avant de la découper en lots : la composition des lots change, pas seulement leur ordre.',
+        'But (connaissance générale, que la page ne démontre pas) : que les lots successifs ne soient pas corrélés (par exemple tous de la même classe, ou dépendants de l\'ordre du fichier), pour que chaque pas de gradient soit un échantillon représentatif.',
+        'Le loader de validation ne mélange pas : la loss moyenne et la précision ne dépendent pas de l\'ordre de passage (au flottant près), et un ordre fixe rend les mesures reproductibles.',
+        'La découpe train/val est un autre sujet : elle a son propre <code>SPLIT_SEED</code>, donc <code>--seed</code> ne change jamais les images de validation.'] },
+    { q: 'Suis la forme du tenseur depuis <code>(B, 1, 28, 28)</code> jusqu\'à <code>(B, 10)</code>, et explique pourquoi <code>CrossEntropyLoss</code> reçoit des logits et non des probabilités après un softmax.',
+      pts: ['Formes : <code>(B, 1, 28, 28)</code>, puis <code>Flatten</code> donne <code>(B, 784)</code>, <code>Linear</code> <code>(B, 256)</code>, <code>ReLU</code> (même forme), <code>Linear</code> <code>(B, 128)</code>, <code>ReLU</code>, <code>Linear</code> <code>(B, 10)</code> : un logit par classe.',
+        'Les logits sont des scores bruts, non bornés ; le softmax les transforme en probabilités positives de somme 1.',
+        '<code>CrossEntropyLoss</code> applique elle-même le softmax (avec le logarithme, en version numériquement stable) puis prend −ln de la probabilité de la vraie classe ; elle reçoit un entier de classe.',
+        'Un softmax ajouté avant elle serait appliqué deux fois : aucune erreur, mais la loss change (1,9593 au lieu de 0,7966 dans l\'exemple de la section 4).',
+        'La précision se calcule sur les logits (<code>argmax</code>) : le softmax ne change pas la classe prédite.'] },
+    { q: 'À quoi servent <code>model.train()</code> et <code>model.eval()</code> ? Pour ce MLP la différence est nulle : pourquoi appeler quand même les deux ?',
+      pts: ['<code>train()</code> et <code>eval()</code> règlent le comportement des couches qui en ont un : <code>Dropout</code> actif seulement en entraînement, <code>BatchNorm</code> avec les statistiques du lot (train) ou les statistiques cumulées (eval).',
+        'Ce MLP n\'a ni <code>Dropout</code> ni <code>BatchNorm</code> : les deux modes donnent exactement les mêmes sorties (écart 0).',
+        'On appelle quand même les deux par discipline : dès qu\'une couche sensible au mode apparaît (<code>BatchNorm</code> à l\'étape 3), l\'oubli de <code>eval()</code> fausse l\'évaluation sans erreur.',
+        '<code>eval()</code> ne coupe pas les gradients : c\'est le rôle de <code>torch.no_grad()</code> (ici le décorateur de <code>evaluate</code>). Deux interrupteurs indépendants.'] },
+  ];
+  const PORTE_KEY = 's02_porte';
+  const loadPorte = () => { try { return JSON.parse(localStorage.getItem(PORTE_KEY) || '{}'); } catch (e) { return {}; } };
+  const savePorte = (v) => { try { localStorage.setItem(PORTE_KEY, JSON.stringify(v)); } catch (e) { /* stockage indisponible */ } };
+  (() => {
+    const saved = loadPorte();
+    $('#porteBox').innerHTML = PORTE.map((x, i) => `<div class="porte-q" data-i="${i}"><p><b>${i + 1}.</b> ${x.q}</p>
+      <textarea aria-label="Ta réponse à la question ${i + 1}" placeholder="Écris ta réponse avec tes mots, sans regarder la page."></textarea>
+      <div class="row"><button class="on reveal">Voir les points attendus</button></div>
+      <div class="pts" hidden>${x.pts.map((t, k) => `<label><input type="checkbox" data-k="${k}"><span>${t}</span></label>`).join('')}<p class="muted sc"></p></div></div>`).join('');
+    document.querySelectorAll('.porte-q').forEach((box) => {
+      const i = +box.dataset.i, ta = box.querySelector('textarea'), s = saved[i] || {};
+      ta.value = s.text || '';
+      const score = () => { const n = box.querySelectorAll('.pts input:checked').length; box.querySelector('.sc').textContent = `Points que tu avais : ${n} / ${PORTE[i].pts.length}. Ceux que tu n'as pas cochés sont à relire dans la section indiquée par le résumé.`; };
+      const persist = () => { const all = loadPorte(); all[i] = { text: ta.value, got: [...box.querySelectorAll('.pts input')].map((c) => c.checked) }; savePorte(all); };
+      ta.addEventListener('input', persist);
+      box.querySelector('.reveal').addEventListener('click', () => { box.querySelector('.pts').hidden = false; box.querySelector('.reveal').disabled = true; score(); });
+      box.querySelectorAll('.pts input').forEach((c, k) => { c.checked = !!(s.got && s.got[k]); c.addEventListener('change', () => { score(); persist(); }); });
+    });
+  })();
+
+  /* ================= Extraits de code (lus dans les fichiers du projet via donnees/s02.js) ================= */
+  (() => {
+    const srcs = D && D.sources;
+    const first = srcs && Object.keys(srcs)[0];
+    document.querySelectorAll('.codeblock[data-code]').forEach((d) => {
+      if (!srcs) { d.hidden = true; return; }
+      const groups = d.dataset.code.split(';').map((gp) => { const at = gp.indexOf('@'); return { file: at < 0 ? first : gp.slice(0, at), ranges: (at < 0 ? gp : gp.slice(at + 1)).split(',').map((r) => r.split('-').map(Number)) }; });
+      let html = '';
+      groups.forEach((gp, k) => {
+        const lines = srcs[gp.file] || [];
+        if (groups.length > 1 || k) html += `<span class="fh">${esc(gp.file)}</span>\n`;
+        gp.ranges.forEach(([a, b], i) => {
+          if (i) html += '<span class="gap">⋮</span>\n';
+          for (let n = a; n <= (b || a); n++) html += `<span class="ln">${n}</span>${esc(lines[n - 1])}\n`;
+        });
+      });
+      d.querySelector('pre').innerHTML = html.replace(/\n$/, '');
+      d.querySelector('.cf').textContent = groups.map((gp) => `${gp.file}, l.${gp.ranges.map((r) => r.join('-')).join(' et ')}`).join(' ; ');
+    });
+  })();
+
+  /* ================= Démarrage ================= */
+  function inputsChanged() {
+    recompute(); drawPad(); updatePadStats();
+    r1(); renderNorm(); r2(); r3(); r3b(); r4(); checkCe(); r5(); r5b(); r5c(); r6(); r6w(); r7();
+  }
+  window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => { r1(); r3(); r3b(); r6(); });
+  inputsChanged();
+})();
+</script>
+</body>
+</html>
