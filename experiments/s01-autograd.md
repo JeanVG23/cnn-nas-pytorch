@@ -37,11 +37,3 @@ Ca devrait etre la meme chose
 * Sans remise à zéro de `.grad`, la descente ne converge pas : la loss oscille de façon chaotique entre 0.003 et 1.3 (la valeur de 0.0236 obtenue à 50 pas n'est qu'un creux temporaire au milieu de ces oscillations).
 * Sensibilité au taux d'apprentissage : avec lr = 2.0, les pas sont trop grands et la descente diverge immédiatement (loss atteignant environ 4e38).
 * Présence de deux nœuds `AccumulateGrad` terminaux dans le graphe : chaque paramètre feuille requérant un gradient (`w1` et `w2`) possède son propre opérateur d'accumulation.
-
-
-
-## 6. Questions à savoir traiter sans le dépôt
-
-1. Pourquoi `.grad` vaut-il le double après deux `backward()` sans remise à zéro, et à quel endroit d'une boucle d'entraînement fait-on cette remise à zéro ?
-2. Que représente `grad_fn` d'un tenseur, et pourquoi un tenseur créé sous `torch.no_grad()` n'en a-t-il pas ?
-3. Pourquoi la mise à jour des poids se fait-elle sous `torch.no_grad()` ?

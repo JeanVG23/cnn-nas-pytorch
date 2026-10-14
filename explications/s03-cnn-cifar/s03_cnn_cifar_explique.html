@@ -1,0 +1,1108 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Palier 3 : un petit CNN sur CIFAR-10</title>
+<style>
+:root {
+  --bg: #f7f7f4;
+  --surface: #ffffff;
+  --surface2: #efefe9;
+  --text: #1d1f23;
+  --muted: #5d6470;
+  --line: #d9d9d0;
+  --accent: #d9480f;
+  --pos: #ff922b;
+  --neg: #4dabf7;
+  --on-strong: #14161a;
+  --hl: #7048e8;
+  --ok: #2b8a3e;
+  --bad: #c92a2a;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #14161a;
+    --surface: #1d2026;
+    --surface2: #262a32;
+    --text: #eceae4;
+    --muted: #a0a6b0;
+    --line: #353a44;
+    --accent: #ff922b;
+    --hl: #9775fa;
+    --ok: #69db7c;
+    --bad: #ff8787;
+  }
+}
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; scroll-padding-top: 64px; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font: 16px/1.6 system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+.wrap { max-width: 980px; margin: 0 auto; padding: 0 16px; }
+
+/* En-tête et navigation */
+header.hero { padding: 40px 0 16px; }
+header.hero h1 { font-size: clamp(1.7rem, 5vw, 2.5rem); line-height: 1.2; margin: 0 0 12px; }
+.lead { font-size: 1.1rem; color: var(--muted); max-width: 68ch; margin: 0; }
+nav.top {
+  position: sticky; top: 0; z-index: 10;
+  background: color-mix(in srgb, var(--bg) 92%, transparent);
+  backdrop-filter: blur(6px);
+  border-bottom: 1px solid var(--line);
+}
+nav.top .wrap { display: flex; gap: 4px 14px; flex-wrap: wrap; padding-top: 10px; padding-bottom: 10px; }
+nav.top a { color: var(--muted); text-decoration: none; font-size: .9rem; font-weight: 600; }
+nav.top a:hover { color: var(--accent); }
+
+/* Sections */
+section { padding: 36px 0 8px; }
+section h2 { font-size: 1.5rem; margin: 0 0 8px; }
+section h2 .n {
+  display: inline-grid; place-items: center; width: 1.7em; height: 1.7em;
+  border-radius: 50%; background: var(--accent); color: #fff; font-size: .8em; margin-right: 8px;
+}
+@media (prefers-color-scheme: dark) { section h2 .n { color: #14161a; } }
+p { margin: 0 0 12px; max-width: 74ch; }
+a { color: var(--hl); }
+.muted { color: var(--muted); }
+.card {
+  background: var(--surface); border: 1px solid var(--line);
+  border-radius: 12px; padding: 16px; margin: 14px 0;
+}
+.card h3, .card h4 { margin: 0 0 6px; }
+.card h3 { font-size: 1.05rem; }
+code, .mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .92em; }
+.tip {
+  border-left: 4px solid var(--hl); background: var(--surface2);
+  padding: 10px 14px; border-radius: 0 8px 8px 0; margin: 14px 0; max-width: 74ch;
+}
+.warn {
+  border-left: 4px solid var(--bad); background: var(--surface2);
+  padding: 10px 14px; border-radius: 0 8px 8px 0; margin: 14px 0; max-width: 74ch;
+}
+
+/* Boutons et champs */
+.row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 10px 0; }
+button {
+  font: inherit; font-size: .9rem; cursor: pointer;
+  background: var(--surface); color: var(--text);
+  border: 1px solid var(--line); border-radius: 8px; padding: 6px 12px;
+}
+button:hover { border-color: var(--accent); }
+button:disabled { opacity: .5; cursor: default; }
+button.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+@media (prefers-color-scheme: dark) { button.on { color: #14161a; } }
+input[type="range"] { accent-color: var(--accent); width: min(100%, 320px); }
+label.f { font-size: .9rem; color: var(--muted); }
+output { font: 600 13px ui-monospace, Menlo, monospace; }
+
+/* Vignettes d'images et canvas */
+button.thumb { display: grid; justify-items: center; gap: 2px; padding: 4px 6px; font-size: .75rem; }
+button.thumb canvas { width: 48px; height: 48px; image-rendering: pixelated; border-radius: 4px; }
+button.thumb.on canvas { outline: 2px solid #fff; }
+canvas.px { image-rendering: pixelated; border: 1px solid var(--line); border-radius: 6px; background: var(--surface2); max-width: 100%; }
+canvas.plot { width: 100%; max-width: 640px; height: auto; display: block; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); }
+canvas.hist { width: 100%; max-width: 330px; height: auto; display: block; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); }
+canvas.clickable { cursor: crosshair; }
+.top { align-items: flex-start; }
+
+/* Extraits du vrai code, lus dans donnees/s03.js (sources) */
+.codeblock { margin: 12px 0; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); }
+.codeblock summary { cursor: pointer; padding: 8px 12px; font-weight: 600; }
+.codeblock summary .muted { font-weight: 400; }
+.codeblock pre { margin: 0; padding: 8px 12px; background: var(--surface2); border-top: 1px solid var(--line); font: 13px/1.6 ui-monospace, Menlo, monospace; overflow-x: auto; white-space: pre; }
+.codeblock .ln { display: inline-block; width: 3.2ch; margin-right: 1.2ch; color: var(--muted); text-align: right; user-select: none; }
+.codeblock .gap { color: var(--muted); padding-left: 4.4ch; }
+.codeblock .fh { color: var(--muted); font-weight: 700; }
+.codeblock .map { margin: 0; padding: 8px 12px; border-top: 1px solid var(--line); font-size: .92rem; max-width: none; }
+.predict { border: 2px solid var(--hl); border-radius: 10px; background: var(--surface); padding: 12px 14px; margin: 12px 0; }
+.predict h4 { margin: 0 0 6px; }
+.predict > p { max-width: 74ch; }
+.predict .tip { margin-bottom: 0; }
+.locked { opacity: .35; filter: grayscale(.5); pointer-events: none; }
+.porte-q { margin: 14px 0; }
+.porte-q textarea { width: 100%; min-height: 96px; font: inherit; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); color: var(--text); resize: vertical; }
+.porte-q .pts { margin-top: 8px; }
+.porte-q .pts label { display: flex; gap: 8px; align-items: flex-start; margin: 6px 0; cursor: pointer; }
+.porte-q .pts input { margin-top: 5px; accent-color: var(--accent); flex: 0 0 auto; }
+.resume { max-width: 74ch; padding-left: 1.4em; }
+.resume li { margin: 6px 0; }
+
+/* Tables de nombres */
+.tblwrap { overflow-x: auto; padding-bottom: 6px; }
+table.mt { border-collapse: separate; border-spacing: 2px; font: 600 12px ui-monospace, Menlo, monospace; }
+table.mt th { color: var(--muted); font-weight: 700; padding: 2px 6px; min-width: 36px; }
+table.mt td { min-width: 36px; height: 28px; text-align: center; border: 1px solid var(--line); border-radius: 4px; padding: 0 3px; }
+table.mt td.hot { color: var(--on-strong); }
+table.mt.g3 td { min-width: 52px; }
+table.pt { border-collapse: collapse; font-size: .9rem; width: 100%; }
+table.pt th, table.pt td { padding: 5px 8px; border-bottom: 1px solid var(--line); text-align: left; white-space: nowrap; }
+table.pt th { color: var(--muted); font-size: .8rem; }
+table.pt td.num { font-family: ui-monospace, Menlo, monospace; text-align: right; }
+table.pt td.wrap2 { white-space: normal; }
+.up { color: var(--ok); font-weight: 700; }
+.down { color: var(--bad); font-weight: 700; }
+.two { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 14px; }
+.two h4 { font-size: .95rem; }
+
+/* Curseurs */
+.sl { display: grid; grid-template-columns: 110px 1fr 70px; gap: 10px; align-items: center; margin: 4px 0; }
+.sl input[type="range"] { width: 100%; }
+.sl output { text-align: right; }
+.sl label { font-size: .9rem; color: var(--muted); }
+
+/* Barres */
+.bar-row { display: grid; grid-template-columns: 100px 1fr 210px; gap: 10px; align-items: center; margin: 4px 0; font-size: .9rem; }
+.bar { height: 16px; background: var(--surface2); border-radius: 8px; overflow: hidden; border: 1px solid var(--line); }
+.bar span { display: block; height: 100%; background: var(--accent); transition: width .15s; }
+.bar.big span { background: var(--hl); }
+.bar-row.sel { background: var(--surface2); border-radius: 6px; outline: 2px solid var(--hl); }
+.bar-row.pickable { cursor: pointer; }
+.bar-row.p3 { grid-template-columns: 150px 1fr 230px; }
+.formula { font: 13px/1.7 ui-monospace, Menlo, monospace; background: var(--surface2); border-radius: 8px; padding: 8px 12px; margin: 6px 0; overflow-x: auto; }
+.verdict { font-size: 1.05rem; font-weight: 700; margin-top: 8px; }
+.bad { color: var(--bad); }
+.stats { display: flex; flex-wrap: wrap; gap: 10px 26px; margin: 8px 0; }
+.stat b { display: block; font: 700 1.25rem ui-monospace, Menlo, monospace; }
+.stat span { font-size: .8rem; color: var(--muted); }
+.chk { font-size: .85rem; color: var(--muted); }
+.chk b { color: var(--ok); }
+
+/* Boîtes de formes */
+.fm { display: flex; flex-wrap: wrap; gap: 10px; align-items: flex-end; margin: 10px 0; }
+.fm .box { display: grid; justify-items: center; gap: 2px; font: 600 11px ui-monospace, Menlo, monospace; color: var(--muted); }
+.fm .box i { display: block; border: 2px solid var(--accent); background: color-mix(in srgb, var(--accent) 12%, var(--surface)); border-radius: 3px; box-shadow: 4px -4px 0 -1px var(--surface2), 4px -4px 0 0 var(--line); }
+.fm .arrow { align-self: center; color: var(--muted); }
+
+/* Quiz */
+.quiz-head { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; justify-content: space-between; margin-bottom: 4px; }
+.quiz-head .score { font-weight: 700; }
+.q { border: 1px solid var(--line); border-radius: 10px; padding: 14px; margin: 14px 0; background: var(--surface); }
+.q .qt { font-weight: 700; margin: 0 0 4px; max-width: none; }
+.q .hint { font-size: .85rem; color: var(--muted); margin: 0 0 8px; }
+.q .tag { display: inline-block; font-size: .7rem; font-weight: 700; letter-spacing: .03em; text-transform: uppercase; padding: 2px 8px; border-radius: 99px; background: var(--surface2); color: var(--muted); margin-right: 6px; vertical-align: 2px; }
+.q .tag.trap { background: var(--bad); color: #fff; }
+.q .tag.multi { background: var(--hl); color: #fff; }
+@media (prefers-color-scheme: dark) { .q .tag.trap, .q .tag.multi { color: #14161a; } }
+.opt { display: flex; gap: 10px; align-items: flex-start; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; margin: 6px 0; cursor: pointer; }
+.opt input { margin-top: 5px; accent-color: var(--accent); flex: 0 0 auto; }
+.opt .ot { min-width: 0; }
+.opt .why { display: none; font-size: .88rem; color: var(--muted); margin-top: 4px; }
+.q.done .opt { cursor: default; }
+.q.done .opt .why { display: block; }
+.opt.good { border-color: var(--ok); background: color-mix(in srgb, var(--ok) 13%, var(--surface)); }
+.opt.wrong { border-color: var(--bad); background: color-mix(in srgb, var(--bad) 13%, var(--surface)); }
+.opt.miss { border-color: var(--ok); border-style: dashed; }
+.q .explain { display: none; border-left: 4px solid var(--hl); background: var(--surface2); padding: 10px 14px; border-radius: 0 8px 8px 0; margin-top: 10px; }
+.q.done .explain { display: block; }
+.q .explain p { max-width: none; margin: 0 0 8px; }
+.q .res { font-weight: 700; margin-top: 8px; }
+.q .res.ok { color: var(--ok); } .q .res.part { color: var(--accent); } .q .res.ko { color: var(--bad); }
+
+footer { padding: 36px 0 60px; color: var(--muted); font-size: .85rem; }
+
+@media (max-width: 700px) {
+  .bar-row { grid-template-columns: 80px 1fr 120px; font-size: .78rem; }
+  .bar-row.p3 { grid-template-columns: 1fr; gap: 2px; margin: 10px 0; }
+  .sl { grid-template-columns: 84px 1fr 56px; }
+}
+</style>
+</head>
+<body>
+
+<header class="hero">
+  <div class="wrap">
+    <h1>Un petit CNN sur CIFAR-10 : que calcule-t-il, et combien pèse-t-il ?</h1>
+    <p class="lead">Palier 3 : trois blocs Conv2d, BatchNorm, ReLU, MaxPool, un pooling global et une couche linéaire, entraînés 15 époques. Tu vas suivre une vraie image à travers les vrais poids du réseau (le passage avant est recalculé dans cette page), compter les 94 762 paramètres, comprendre BatchNorm et le planning du taux d'apprentissage, puis lire les résultats avec une barre d'erreur. Huit étapes, un quiz à la fin. Prérequis : <a href="../introduction-cnn/cnn_explique.html">l'introduction aux CNN</a> (filtre, ReLU, pooling) et le palier 2.</p>
+  </div>
+</header>
+
+<nav class="top">
+  <div class="wrap">
+    <a href="#s1">1. Formes</a>
+    <a href="#s2">2. Convolution</a>
+    <a href="#s3">3. Paramètres</a>
+    <a href="#s4">4. BatchNorm</a>
+    <a href="#s5">5. Tête</a>
+    <a href="#s6">6. Données</a>
+    <a href="#s7">7. Entraînement</a>
+    <a href="#s8">8. Résultats</a>
+    <a href="#bilan">Bilan</a>
+    <a href="#resume">Résumé</a>
+    <a href="#porte">Explique</a>
+    <a href="#quiz">Quiz</a>
+  </div>
+</nav>
+
+<main class="wrap">
+
+<div id="nodata" class="warn" hidden><b>Fichier de données introuvable.</b> Lance <code>uv run python explications/s03-cnn-cifar/scripts/exporter_s03.py</code> depuis la racine du projet : la page a besoin de <code>donnees/s03.js</code>. Le quiz reste utilisable.</div>
+
+<div class="card">
+  <h3>Ce qui est réel, ce qui est recalculé, ce qui est relancé</h3>
+  <p><b>Réel :</b> l'architecture <code>CifarCNN</code> du dépôt, les formes (exécutées par PyTorch), les 94 762 paramètres, les poids du checkpoint <code>data/checkpoints/s03_cnn_cifar.pt</code> (le modèle du dernier run, graine 2), 10 images du jeu de validation, le planning <code>OneCycleLR</code>, les résultats du rapport (3 graines). <b>Recalculé dans la page :</b> tout le passage avant, à partir des poids exportés (contrôlé contre les sorties de PyTorch). <b>Relancé pour la page :</b> une courbe d'entraînement de graine 0, validation seulement, parce que le palier n'a pas gardé l'historique par époque. <b>Jamais lu ici :</b> le jeu test (ses chiffres viennent du rapport). La prédiction de Jean (78 %, 60 000 paramètres) est consignée dans le rapport (section 2) et déjà mesurée : la page ne la modifie pas.</p>
+</div>
+
+<div class="card" id="common">
+  <h3>Ton image</h3>
+  <p class="muted">Dix images de validation (une par classe). Toutes les sections s'appliquent à l'image choisie ; la section 6 permet de la décaler et de la retourner.</p>
+  <div class="row" id="thumbs"></div>
+  <div class="row top">
+    <canvas id="cvMain" class="px" width="32" height="32" style="width:160px;height:160px"></canvas>
+    <div id="mainInfo" style="flex:1 1 260px"></div>
+  </div>
+</div>
+
+<!-- 1 --------------------------------------------------------------- -->
+<section id="s1">
+  <h2><span class="n">1</span>Suivre la forme (B, C, H, W) à travers le réseau</h2>
+  <p><b>Intuition.</b> Imagine une pile de photos qui traverse une machine à trois étages. À chaque étage, chaque photo devient deux fois plus petite (on ne garde que la valeur la plus forte de chaque carré de 4 pixels), mais on la regarde avec plus de filtres : 32, puis 64, puis 128 « calques ». Un tenseur s'écrit (B, C, H, W) : B images par lot, C canaux (les calques), H hauteur, W largeur. Une convolution <code>k=3, padding=1</code> ne change ni H ni W : seul <code>MaxPool2d(2)</code> les divise par 2.</p>
+  <p><b>À toi :</b> déplace le curseur du côté de l'image d'entrée. Trouve les tailles que le réseau refuse, et regarde ce que devient la forme quand la taille n'est pas divisible par 8.</p>
+  <div class="card main">
+    <div class="sl"><label for="sz">Côté H = W</label><input type="range" id="sz" min="2" max="64" value="32"><output id="szOut"></output></div>
+    <div class="row"><button data-sz="32">32 (CIFAR-10)</button><button data-sz="30">30</button><button data-sz="28">28</button><button data-sz="64">64</button><button data-sz="8">8</button><button data-sz="7">7</button></div>
+    <div id="s1out"></div>
+  </div>
+  <details class="codeblock" open data-code="steps/s03_cnn_cifar.py@25-31,34-45,48-56"><summary>Dans le code : <code>conv_block</code>, <code>CifarCNN</code> et <code>trace_shapes</code> <span class="muted">(<span class="cf"></span>)</span></summary><pre></pre><p class="map">Les commentaires <code>(B, c_out, H/2, W/2)</code> des lignes 30 et 39-41 sont les formes de la table ci-dessus. <code>trace_shapes</code> (l. 48-56) est la fonction que l'export a exécutée sur de vraies tailles : c'est elle qui a produit les lignes marquées « PyTorch » (la page ne la rejoue pas). La page calcule les formes avec sa propre règle (convolution : H inchangé ; pooling : division entière par 2) et la compare aux exécutions réelles.</p></details>
+  <div class="tip">
+    <b>À retenir :</b> trois <code>MaxPool2d(2)</code> font passer 32 → 16 → 8 → 4. Sur une taille non divisible, le pooling arrondit vers le bas, et le pooling global de la tête (section 5) absorbe la taille spatiale qui reste. Sous 8 pixels de côté, un pooling reçoit un tenseur de taille 1 et refuse.
+  </div>
+</section>
+
+<!-- 2 --------------------------------------------------------------- -->
+<section id="s2">
+  <h2><span class="n">2</span>Une convolution à la main : 27 multiplications pour un pixel</h2>
+  <p><b>Intuition.</b> Un filtre est un tampon encreur de 3×3×3 : on le pose sur un carré 3×3 de l'image, dans les trois couleurs, on multiplie chaque valeur par le poids qui est dessous, et on additionne les 27 produits. Cela donne <i>un</i> nombre : le pixel de sortie. En faisant glisser le tampon sur toute l'image, on obtient une carte. Avec 32 tampons différents, on obtient les 32 canaux de sortie. L'introduction aux CNN a montré l'idée ; ici ce sont les vrais poids appris par le réseau, appliqués à ton image.</p>
+  <p><b>À toi :</b> clique sur un pixel de l'image (ou utilise les curseurs de ligne et de colonne), change de filtre, et vérifie que la somme des 27 produits est bien la valeur de la carte au pixel choisi. Essaie un pixel du bord : le patch contient des zéros (<code>padding=1</code>).</p>
+  <div class="card main">
+    <div class="sl"><label for="filt">Filtre</label><input type="range" id="filt" min="0" max="31" value="0"><output id="filtOut"></output></div>
+    <div class="sl"><label for="py">Ligne y</label><input type="range" id="py" min="0" max="31" value="16"><output id="pyOut"></output></div>
+    <div class="sl"><label for="px">Colonne x</label><input type="range" id="px" min="0" max="31" value="16"><output id="pxOut"></output></div>
+    <div class="row top">
+      <div><div class="muted" style="font-size:.85rem">Image (clique pour choisir le pixel)</div><canvas id="cvIn" class="px clickable" width="32" height="32" style="width:192px;height:192px"></canvas></div>
+      <div><div class="muted" style="font-size:.85rem">Carte du filtre (orange : positif, bleu : négatif)</div><canvas id="cvOut" class="px clickable" width="32" height="32" style="width:192px;height:192px"></canvas></div>
+    </div>
+    <div id="s2out"></div>
+    <p class="chk" id="s2chk"></p>
+  </div>
+  <details class="codeblock" open data-code="steps/s03_cnn_cifar.py@25-28"><summary>Dans le code : la convolution de <code>conv_block</code> <span class="muted">(<span class="cf"></span>)</span></summary><pre></pre><p class="map">Ligne 27 : <code>Conv2d(c_in, c_out, kernel_size=3, padding=1, bias=False)</code>. Pour le bloc 1, <code>c_in = 3</code> et <code>c_out = 32</code> : 32 filtres de 3×3×3, soit les 27 poids que tu viens de multiplier. <code>padding=1</code> ajoute une couche de zéros autour (valeurs normalisées) : c'est pourquoi un pixel du bord a un patch à moitié vide et que la taille ne change pas. <code>bias=False</code> : il n'y a pas de terme constant à ajouter à la somme (section 4).</p></details>
+  <div class="tip">
+    <b>À retenir :</b> un filtre a <code>c_in × k × k</code> poids (27 ici), une couche a <code>c_out</code> filtres, et chaque filtre produit une carte. La page recalcule les 27 produits elle-même et retombe sur la valeur de la carte : une convolution n'a rien de plus mystérieux.
+  </div>
+</section>
+
+<!-- 3 --------------------------------------------------------------- -->
+<section id="s3">
+  <h2><span class="n">3</span>Compter les paramètres : pourquoi 94 762 et pas 60 000</h2>
+  <p><b>Intuition.</b> Une couche de convolution a <code>c_out</code> filtres, chacun fait de <code>c_in × k × k</code> poids. Le nombre de poids est donc un <i>produit</i> de deux nombres de canaux : quand les canaux montent de 32 à 64 puis à 128, le troisième bloc pèse bien plus que les deux premiers réunis. BatchNorm ajoute 2 paramètres par canal (γ et β), la tête <code>Linear(128, 10)</code> en ajoute 128×10 + 10.</p>
+  <p><b>À toi :</b> règle les canaux (c1, c2, c3), la taille du noyau et le biais. Regarde la part de chaque couche, puis essaie d'approcher les 60 000 paramètres prédits (à 2 % près). Le bouton « Révéler » propose une solution.</p>
+  <div class="card main">
+    <div class="sl"><label for="c1">Canaux c1</label><input type="range" id="c1" min="4" max="256" step="4" value="32"><output id="c1Out"></output></div>
+    <div class="sl"><label for="c2">Canaux c2</label><input type="range" id="c2" min="4" max="256" step="4" value="64"><output id="c2Out"></output></div>
+    <div class="sl"><label for="c3">Canaux c3</label><input type="range" id="c3" min="4" max="256" step="4" value="128"><output id="c3Out"></output></div>
+    <div class="row"><span class="muted">Noyau k :</span><span id="kBtns"></span><label class="f"><input type="checkbox" id="biasChk"> bias=True dans les convolutions</label></div>
+    <div class="row"><button id="pPalier">Le palier (32, 64, 128)</button><button id="pDouble">Doubler tous les canaux</button><button id="pReveal">Révéler une solution proche de 60 000</button></div>
+    <div id="s3out"></div>
+    <p class="verdict" id="s3verdict"></p>
+  </div>
+  <div class="card">
+    <h3>La formule est-elle la bonne ? Contrôle contre PyTorch</h3>
+    <p class="muted">Chaque ligne est un réseau construit avec PyTorch par le script d'export (même structure que <code>CifarCNN</code>, canaux et noyau variables). La formule de la page doit retrouver le total.</p>
+    <div class="tblwrap" id="s3grid"></div>
+  </div>
+  <div class="card">
+    <h3>Paramètres appris et état sauvegardé : deux comptes différents</h3>
+    <div id="s3state"></div>
+  </div>
+  <details class="codeblock" open data-code="steps/s03_cnn_cifar.py@81-83;steps/s03_cnn_cifar.py@59-66,92-100"><summary>Dans le code : le compte et le checkpoint <span class="muted">(<span class="cf"></span>)</span></summary><pre></pre><p class="map">Ligne 82 : <code>sum(p.numel() for p in model.parameters())</code> compte uniquement les paramètres appris (poids, γ, β) : 94 762. <code>save_checkpoint</code> (l. 59-61) enregistre <code>state_dict()</code>, qui contient en plus les statistiques de BatchNorm. <code>load_checkpoint</code> (l. 64-66) recharge sur CPU (<code>map_location="cpu"</code>) puis <code>load_state_dict</code> copie vers le device du modèle. Les lignes 92-100 sont le contrôle du rapport : sorties identiques après rechargement, calculées en mode <code>eval()</code> des deux côtés.</p></details>
+  <div class="tip">
+    <b>À retenir :</b> le total du palier se décompose en 93 024 poids de convolution + 448 paramètres de BatchNorm + 1 290 de la tête. L'écart avec la prédiction s'explique par le produit <code>c_in × c_out</code> (le rapport l'attribue à la croissance quadratique des poids avec les canaux) : doubler tous les canaux multiplie le total par près de 4, pas par 2.
+  </div>
+</section>
+
+<!-- 4 --------------------------------------------------------------- -->
+<section id="s4">
+  <h2><span class="n">4</span>BatchNorm : normaliser par canal, et pourquoi bias=False</h2>
+  <p><b>Intuition.</b> Dans une classe de 30 élèves, un contrôle trop dur écrase toutes les notes. On recentre (on retire la moyenne de la classe), on remet à l'échelle (on divise par l'écart-type), puis chaque matière applique son propre réglage appris : γ pour l'échelle, β pour le décalage. BatchNorm fait ça pour chaque canal : <code>y = γ · (x − μ) / √(σ² + ε) + β</code>. En <b>train</b>, μ et σ² sont ceux du lot en cours (sur toutes les valeurs B×H×W du canal). En <b>eval</b>, ce sont <code>running_mean</code> et <code>running_var</code>, des moyennes mobiles accumulées pendant l'entraînement.</p>
+  <p><b>À toi :</b> ici le lot est formé de tes images de validation (la sortie du bloc 1 avant BatchNorm, pour le canal choisi). Passe de « train » à « eval », fais varier la taille du lot, puis ajoute un décalage constant b avant la normalisation : c'est ce que ferait un biais.</p>
+  <div class="card main">
+    <div class="sl"><label for="bnCh">Canal</label><input type="range" id="bnCh" min="0" max="31" value="0"><output id="bnChOut"></output></div>
+    <div class="sl"><label for="bnK">Images du lot</label><input type="range" id="bnK" min="1" max="10" value="4"><output id="bnKOut"></output></div>
+    <div class="sl"><label for="bnB">Décalage b</label><input type="range" id="bnB" min="-5" max="5" step="0.5" value="0"><output id="bnBOut"></output></div>
+    <div class="row"><button id="bnTrain" class="on">Mode train (stats du lot)</button><button id="bnEval">Mode eval (running stats)</button></div>
+    <div class="row top">
+      <div><div class="muted" style="font-size:.85rem">Avant BatchNorm : conv + b</div><canvas id="cvBn1" class="hist" width="330" height="150"></canvas></div>
+      <div><div class="muted" style="font-size:.85rem">Après BatchNorm : y</div><canvas id="cvBn2" class="hist" width="330" height="150"></canvas></div>
+    </div>
+    <div id="s4out"></div>
+  </div>
+  <div class="card">
+    <h3>Le piège du passage à vide (ligne 86 du palier)</h3>
+    <div id="s4dry"></div>
+  </div>
+  <details class="codeblock" open data-code="steps/s03_cnn_cifar.py@27-28,85-88"><summary>Dans le code : <code>bias=False</code> et <code>model.eval()</code> <span class="muted">(<span class="cf"></span>)</span></summary><pre></pre><p class="map">Ligne 27 : <code>bias=False</code> (commentaire du code : le biais est inutile avant BatchNorm). Ligne 28 : la BatchNorm qui le rend inutile. Ligne 86 : <code>model.eval()</code> avant le passage à vide de 2 images (l. 87-88) : sans lui, la BatchNorm mettrait à jour ses statistiques avec 2 images, ce que la carte ci-dessus quantifie.</p></details>
+  <div class="tip">
+    <b>À retenir :</b> en mode train, ajouter une constante avant BatchNorm ne change rien : la moyenne du lot absorbe le décalage. Le biais de la convolution est donc du poids mort, d'où <code>bias=False</code>. Et <code>running_mean</code> / <code>running_var</code> ne sont pas des paramètres mais font partie de l'état : un passage en mode train les modifie, même sans optimiseur.
+  </div>
+</section>
+
+<!-- 5 --------------------------------------------------------------- -->
+<section id="s5">
+  <h2><span class="n">5</span>Pooling global et tête : de 128 cartes à 10 scores</h2>
+  <p><b>Intuition.</b> Après le bloc 3, chaque image est un empilement de 128 cartes de 4×4, une par « détecteur ». <code>AdaptiveAvgPool2d((1, 1))</code> remplace chaque carte par sa moyenne : 128 nombres, un par détecteur (« à quel point ce détecteur a réagi sur l'image »). <code>Linear(128, 10)</code> est alors un vote : chaque classe additionne les 128 nombres, chacun pondéré par un poids appris, plus un biais. La plus grande somme (le logit) gagne.</p>
+  <p><b>À toi :</b> clique sur une classe pour voir quels détecteurs ont fait pencher son score. Change d'image en haut de la page et regarde le vote changer.</p>
+  <div class="card main">
+    <div class="muted" style="font-size:.85rem">Les 128 valeurs après le pooling global (une barre par canal ; les 6 qui pèsent le plus sur la classe choisie sont colorées)</div>
+    <canvas id="cvPool" class="plot" width="640" height="130" style="margin:6px 0 10px"></canvas>
+    <div id="cls"></div>
+    <div id="s5dec"></div>
+    <p class="chk" id="s5chk"></p>
+  </div>
+  <div class="card">
+    <h3>Pourquoi un pooling global plutôt qu'aplatir ?</h3>
+    <p class="muted">Pour chaque taille d'image, nombre de valeurs que la couche Linear devrait recevoir sans pooling global (Flatten direct) et nombre de poids correspondant. Arithmétique de la page, à partir des formes de la section 1.</p>
+    <div class="tblwrap" id="s5table"></div>
+  </div>
+  <details class="codeblock" open data-code="steps/s03_cnn_cifar.py@37-45"><summary>Dans le code : la tête <span class="muted">(<span class="cf"></span>)</span></summary><pre></pre><p class="map">Ligne 39 : <code>AdaptiveAvgPool2d((1, 1))</code> donne les 128 barres. Ligne 40 : <code>Flatten</code> ne fait que retirer les deux dimensions de taille 1. Ligne 41 : <code>Linear(128, 10)</code> : les 10 lignes de la liste de classes, avec 128 poids chacune plus un biais (1 290 paramètres).</p></details>
+  <div class="tip">
+    <b>À retenir :</b> le pooling global donne à la tête un nombre d'entrées fixé par les canaux (128), pas par la taille de l'image : la couche Linear garde 1 290 paramètres et accepte toute taille que les convolutions laissent passer. Un Flatten direct sur 4×4 donnerait 128 × 4 × 4 = 2 048 entrées, donc 2 048 × 10 + 10 = 20 490 poids, et ne fonctionnerait que pour des images de 32 à 39 pixels de côté (celles qui sortent en 4×4).
+  </div>
+</section>
+
+<!-- 6 --------------------------------------------------------------- -->
+<section id="s6">
+  <h2><span class="n">6</span>Les données : un entraînement augmenté, une validation propre</h2>
+  <p><b>Intuition.</b> Les 50 000 images d'entraînement de CIFAR-10 se découpent en 45 000 pour apprendre et 5 000 pour valider ; les 10 000 images de test sont réservées à la mesure finale. Pour apprendre, on montre chaque image légèrement transformée à chaque époque : décalée de quelques pixels (<code>RandomCrop(32, padding=4)</code>) et parfois retournée (<code>RandomHorizontalFlip</code>). Pour valider, on ne transforme rien : une mesure doit porter sur les images telles quelles.</p>
+  <p><b>À toi :</b> décale l'image de -4 à +4 pixels et retourne-la, ou tire une transformation au hasard. Observe les bandes noires que le décalage laisse, et si le réseau reconnaît encore la classe.</p>
+  <div class="card main">
+    <div class="sl"><label for="dx">Décalage x</label><input type="range" id="dx" min="-4" max="4" value="0"><output id="dxOut"></output></div>
+    <div class="sl"><label for="dy">Décalage y</label><input type="range" id="dy" min="-4" max="4" value="0"><output id="dyOut"></output></div>
+    <div class="row"><label class="f"><input type="checkbox" id="flip"> Retournement horizontal</label><button id="augRand" class="on">Tirer au hasard</button><button id="augReset">Sans augmentation</button></div>
+    <div class="row top">
+      <div><div class="muted" style="font-size:.85rem">Image d'origine (validation)</div><canvas id="cvOrig" class="px" width="32" height="32" style="width:160px;height:160px"></canvas><div id="origInfo" class="chk"></div></div>
+      <div><div class="muted" style="font-size:.85rem">Vue par le réseau avec augmentation</div><canvas id="cvAug" class="px" width="32" height="32" style="width:160px;height:160px"></canvas><div id="augInfo" class="chk"></div></div>
+    </div>
+    <div id="s6out"></div>
+  </div>
+  <div class="card">
+    <h3>Les trois jeux</h3>
+    <div class="tblwrap" id="s6table"></div>
+  </div>
+  <details class="codeblock" open data-code="common/data.py@38-57"><summary>Dans le code : <code>cifar10_loaders</code> <span class="muted">(<span class="cf"></span>)</span></summary><pre></pre><p class="map">Lignes 45-50 : la transformation d'entraînement (les deux curseurs et la case de la carte). Ligne 51 : <code>eval_transform</code>, sans aléa. Lignes 52-53 : deux instances du même jeu, l'une augmentée, l'autre non ; ligne 54 : les mêmes indices (graine de découpe propre, indépendante de <code>--seed</code>) servent aux deux, donc la validation est bien un sous-ensemble disjoint de l'entraînement. Le jeu test vient d'une autre fonction, <code>cifar10_test_loader</code> (l. 60-64), appelée seulement avec <code>--test</code>.</p></details>
+  <div class="tip">
+    <b>À retenir :</b> l'augmentation touche seulement l'entraînement ; la validation et le test voient les images brutes. Deux instances du même jeu avec les mêmes indices permettent d'augmenter l'un sans l'autre. Dernier détail : le remplissage de <code>RandomCrop</code> est noir (valeur 0 avant normalisation), alors que le <code>padding</code> d'une convolution met des zéros <i>après</i> normalisation (la couleur moyenne).
+  </div>
+</section>
+
+<!-- 7 --------------------------------------------------------------- -->
+<section id="s7">
+  <h2><span class="n">7</span>Entraîner : AdamW, OneCycleLR et la boucle de fit</h2>
+  <p><b>Intuition.</b> Le taux d'apprentissage est l'allure d'un randonneur. <code>OneCycleLR</code> démarre lentement (taux 25 fois plus petit que le pic), accélère jusqu'au pic <code>lr = 3e-3</code> (30 % du trajet), puis ralentit jusqu'à presque zéro : les derniers pas affinent. Le planning avance d'un cran après <i>chaque lot</i> (352 lots par époque, 45 000 images / 128), pas après chaque époque : 15 × 352 = 5 280 pas.</p>
+  <p><b>À toi :</b> déplace le curseur d'époque. Lis le taux d'apprentissage et les mesures de cette époque.</p>
+  <div class="card main">
+    <div class="sl"><label for="ep">Époque</label><input type="range" id="ep" min="1" max="15" value="5"><output id="epOut"></output></div>
+    <div class="muted" style="font-size:.85rem">Taux d'apprentissage, pas après pas (planning réel de PyTorch)</div>
+    <canvas id="cvLr" class="plot" width="640" height="190"></canvas>
+    <div class="two" style="margin-top:10px">
+      <div><div class="muted" style="font-size:.85rem">Perte par époque : entraînement (orange) et validation (violet)</div><canvas id="cvLoss" class="plot" width="400" height="200"></canvas></div>
+      <div><div class="muted" style="font-size:.85rem">Précision de validation par époque</div><canvas id="cvAcc" class="plot" width="400" height="200"></canvas></div>
+    </div>
+    <div id="s7out"></div>
+  </div>
+  <details class="codeblock" open data-code="common/train.py@26-35,72-73"><summary>Dans le code : <code>_train_one_epoch</code> et le planning <span class="muted">(<span class="cf"></span>)</span></summary><pre></pre><p class="map">Lignes 28-32 : un pas (perte, <code>zero_grad</code>, <code>backward</code>, <code>optimizer.step()</code>), puis <code>scheduler.step()</code> à chaque lot : c'est ce qui fait avancer le curseur du graphique du taux. Ligne 72 : AdamW avec <code>lr</code> (3e-3) et <code>weight_decay=5e-4</code>. Ligne 73 : <code>OneCycleLR(max_lr=lr, total_steps=epochs * len(train_loader))</code>, soit 5 280 pas : <code>lr</code> est le pic, pas le départ.</p></details>
+  <div class="tip">
+    <b>À retenir :</b> le taux n'est pas constant : il monte pendant environ 30 % de l'entraînement (jusqu'à l'époque 5), puis redescend. Le <code>scheduler.step()</code> suit les lots, pas les époques.
+  </div>
+</section>
+
+<!-- 8 --------------------------------------------------------------- -->
+<section id="s8">
+  <h2><span class="n">8</span>Lire les résultats : 3 graines, val, test et barre d'erreur</h2>
+  <p><b>Intuition.</b> Mesurer la précision sur 5 000 images, c'est tirer 5 000 pièces : même avec un modèle de précision « vraie » de 78 %, la précision mesurée varie d'un jeu d'images à l'autre. Cette incertitude de tirage, d'environ <code>√(p(1−p)/n)</code> (approximation binomiale), est indépendante de l'écart entre graines : celui-ci (le « ± » du tableau est l'écart-type des 3 graines) ne mesure que l'aléa de l'entraînement, sur <i>les mêmes</i> images.</p>
+  <p><b>À toi :</b> compare, sur l'axe, l'écart entre graines et l'incertitude de tirage pour les deux jeux. Fais varier le nombre d'images n pour voir comment l'incertitude se resserre.</p>
+  <div class="card main">
+    <div class="tblwrap" id="s8runs"></div>
+    <div id="s8stats" style="margin-top:8px"></div>
+    <div class="sl" style="margin-top:12px"><label for="nImg">Taille du jeu n</label><input type="range" id="nImg" min="500" max="20000" step="500" value="5000"><output id="nImgOut"></output></div>
+    <div id="s8svg"></div>
+    <p id="s8read" class="verdict"></p>
+  </div>
+  <div class="two">
+    <div class="card"><h3>La prédiction de Jean face aux mesures</h3><div id="s8pred"></div></div>
+    <div class="card"><h3>Le chrono : même configuration, temps très différents</h3><div id="s8time"></div></div>
+  </div>
+  <details class="codeblock" open data-code="steps/s03_cnn_cifar.py@102-118"><summary>Dans le code : l'enregistrement du run <span class="muted">(<span class="cf"></span>)</span></summary><pre></pre><p class="map">Lignes 102-113 : la ligne JSONL du run (graine, <code>n_params</code>, <code>train_seconds</code>, précision et perte de validation). Lignes 114-117 : avec <code>--test</code>, le jeu test est lu <i>une fois</i> en fin de run et ajoute <code>test_acc</code> et <code>test_loss</code>. Les graines 0, 1 et 2 du tableau viennent de ces lignes.</p></details>
+  <div class="tip">
+    <b>À retenir :</b> l'écart entre graines (±0,32 en validation, ±0,08 en test) mesure l'aléa de l'entraînement ; l'incertitude de tirage des images (environ ±0,6 et ±0,4) est plus grande. Un écart de 0,59 point entre validation et test n'est donc pas interprétable comme un signe de généralisation, ni dans un sens ni dans l'autre.
+  </div>
+</section>
+
+<!-- Bilan ----------------------------------------------------------- -->
+<section id="bilan">
+  <h2><span class="n">9</span>Bilan</h2>
+  <div class="two">
+    <div class="card"><h3>Ce que ça prouve</h3>
+      <p>Un réseau de 94 762 paramètres atteint 78,19 % en validation (5 000 images) et 77,60 % en test (10 000 images), moyennes de 3 graines, après 15 époques. Les formes, le compte de paramètres et les comptes par couche sont vérifiés par PyTorch (la dernière convolution porte 77,8 % des paramètres, pourcentage calculé par la page). Le checkpoint se recharge avec des sorties égales à 1e-5 près (torch.allclose). La prédiction de 78 % était juste ; celle de 60 000 paramètres était loin du compte, et le rapport attribue l'écart au produit des canaux.</p></div>
+    <div class="card"><h3>Ce que ça ne prouve pas</h3>
+      <p>Que l'écart val/test de 0,59 point soit un bon signe de généralisation : il est du même ordre que l'incertitude de tirage. Que ce soient les augmentations et le pooling global qui évitent le surapprentissage : le palier ne compare pas avec et sans (aucune ablation). Que 78 % soit un bon score : aucune comparaison n'a encore été faite. Que 101,7 s soit le temps de ce réseau : les temps vont de 68,8 à 132,9 s pour la même configuration.</p></div>
+  </div>
+  <div class="card" id="pont">
+    <h3>Où ça reviendra dans les prochaines étapes</h3>
+    <div class="tblwrap"><table class="pt">
+      <tr><th>Dans cette étape</th><th>Ce que ça devient ensuite (d'après la spec du projet)</th><th>Vu sur cette page ?</th></tr>
+      <tr><td class="wrap2">Blocs conv_block (32, 64, 128) et tête</td><td class="wrap2">Palier 4 : <code>build_model(config)</code> construit le CNN depuis un dict ; la config équivalente à s03 doit donner le même nombre de paramètres.</td><td>Oui : architecture, formes, comptage</td></tr>
+      <tr><td class="wrap2">Formules de comptage des paramètres</td><td class="wrap2">Palier 5 : tableau précision / paramètres / FLOPs / latence pour 6 configs ; les FLOPs d'une convolution suivent <code>2 · C_out · C_in · k · k · H_out · W_out · B</code>.</td><td>Oui pour les paramètres, non pour les FLOPs</td></tr>
+      <tr><td class="wrap2">AdaptiveAvgPool2d((1, 1)) puis Linear</td><td class="wrap2">Palier 4 : tête imposée ; <code>Linear(C_out du dernier étage, 10)</code> ; au plus 5 étages avec pooling sur du 32×32.</td><td>Oui (sections 1 et 5)</td></tr>
+      <tr><td class="wrap2">fit dans common/train.py</td><td class="wrap2">Palier 5 : 6 configs entraînées avec le même <code>fit</code>, contrat inchangé.</td><td>Oui (section 7)</td></tr>
+      <tr><td class="wrap2">Découpe 45 000 / 5 000 et test lu une fois</td><td class="wrap2">Décisions sur la validation ; test relu une seule fois en fin de palier 5.</td><td>Oui (sections 6 et 8)</td></tr>
+      <tr><td class="wrap2">Temps par graine très variable</td><td class="wrap2">Palier 5 : latence mesurée à la main (échauffement, <code>synchronize</code>, médiane), pas avec un seul chrono.</td><td>En partie : variabilité vue, méthode non</td></tr>
+    </table></div>
+  </div>
+  <div class="tip"><b>Limites de la page, et suite.</b> Les poids affichés sont ceux d'un seul modèle (graine 2) et la courbe vient d'un run relancé (graine 0, qui retombe sur les mêmes chiffres finaux que le rapport). Le passage avant JavaScript est en précision réduite (poids arrondis, flottants 32 bits), d'où des écarts inférieurs à 1e-3 avec PyTorch sur les logits. Le palier 4 rendra l'architecture configurable ; le palier 5 mesurera le coût.</div>
+</section>
+
+<section id="resume">
+  <h2><span class="n">10</span>Résumé en 10 lignes</h2>
+  <ol class="resume">
+    <li>Une <code>Conv2d(c_in, c_out, k=3, padding=1)</code> a <code>c_out × c_in × k × k</code> poids et conserve H et W ; la première couche : 32 filtres de 27 poids, soit 864.</li>
+    <li><code>MaxPool2d(2)</code> divise H et W par 2 en arrondissant vers le bas : (3, 32, 32) devient (32, 16, 16), puis (64, 8, 8), puis (128, 4, 4).</li>
+    <li>Poids des convolutions : 864 + 18 432 + 73 728 = 93 024 ; la dernière convolution pèse 77,8 % des 94 762 paramètres, car le nombre de poids croît avec le produit c_in × c_out.</li>
+    <li>94 762 = 93 024 (convolutions) + 448 (γ et β de BatchNorm) + 1 290 (Linear) ; le rapport attribue l'écart avec les 60 000 prédits à ce produit : doubler tous les canaux multiplie le total par près de 4.</li>
+    <li>BatchNorm : y = γ·(x − μ)/√(σ² + ε) + β ; μ et σ² viennent du lot en train, de <code>running_mean</code> et <code>running_var</code> en eval ; ces deux tenseurs sont dans <code>state_dict()</code> (95 213 éléments) mais pas dans <code>parameters()</code>.</li>
+    <li><code>bias=False</code> avant BatchNorm : en mode train, la soustraction de la moyenne du lot annule tout décalage constant.</li>
+    <li><code>model.eval()</code> avant tout passage à vide ou toute comparaison : en mode train, 2 images suffisent à dégrader les statistiques (de 78,52 % à 77,50 % de précision de validation, mesuré par le script d'export sur le checkpoint).</li>
+    <li><code>AdaptiveAvgPool2d((1, 1))</code> donne 128 valeurs quelle que soit la taille spatiale ; <code>Linear(128, 10)</code> compte 1 290 paramètres, contre 20 490 pour un Flatten direct sur 4×4.</li>
+    <li>Entraînement : 45 000 images augmentées (RandomCrop 32 avec padding 4, retournement : 162 variantes), validation (5 000) et test (10 000) sans augmentation ; AdamW (lr 3e-3, weight_decay 5e-4) avec OneCycleLR (pic à 30 %, un pas par lot, 5 280 pas).</li>
+    <li>Résultats sur 3 graines : validation 78,19 % (±0,32), test 77,60 % (±0,08) ; l'incertitude de tirage (environ ±0,6 et ±0,4 point) dépasse l'écart entre graines, donc l'écart val/test de 0,59 point ne se lit pas comme un signe de généralisation.</li>
+  </ol>
+</section>
+
+<section id="porte">
+  <h2><span class="n">11</span>Explique avec tes mots</h2>
+  <p class="muted">Trois questions à savoir traiter sans le dépôt ni la page. Écris ta réponse sans regarder, puis révèle les points attendus et coche ceux que tu avais déjà. Ce que tu écris reste dans ce navigateur, nulle part ailleurs.</p>
+  <div class="card" id="porteBox"></div>
+</section>
+
+<section id="quiz">
+  <h2>Quiz : peux-tu expliquer le palier 3 ?</h2>
+  <p class="muted">Dix questions sur les points les plus sensibles. Certaines sont des pièges : chaque réponse, juste ou fausse, est expliquée après validation.</p>
+  <div class="card" id="quizBox"></div>
+</section>
+
+</main>
+
+<footer>
+  <div class="wrap">Page pédagogique autonome : aucun réseau, aucune dépendance, sauf le fichier voisin <code>donnees/s03.js</code>. Les chiffres viennent du code du projet exécuté par <code>scripts/exporter_s03.py</code> (poids, formes, comptes, planning, courbe) et du rapport <code>experiments/s03-cnn-cifar.md</code> avec <code>experiments/results/s03.jsonl</code> (résultats). Les calculs d'incertitude binomiale et les comparaisons de la section 8 sont de la page, pas du rapport.</div>
+</footer>
+
+<script src="donnees/s03.js"></script>
+<script>
+(() => {
+  const $ = (s) => document.querySelector(s);
+  const $$ = (s) => [...document.querySelectorAll(s)];
+  const esc = (s) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  const fr = (x, d) => (Object.is(+x.toFixed(d), -0) ? 0 : x).toFixed(d).replace('.', ',');  // décimale française, pas de « -0,00 »
+  const fmtI = (n) => String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
+  const sum = (a) => a.reduce((x, y) => x + y, 0);
+  const sci = (x) => x.toExponential(1).replace('.', ',');
+  const css = (name) => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+
+  const D = window.S03, HAS = !!D;
+  if (!HAS) $('#nodata').hidden = false;
+  const CLS = HAS ? D.classes : [];
+  const ID = { dx: 0, dy: 0, flip: false };
+  const state = { img: 0, aug: { ...ID }, sz: 32, filt: 0, py: 16, px: 16, c: [32, 64, 128], k: 3, bias: false, revealed: false,
+    bnCh: 0, bnK: 4, bnMode: 'train', bnB: 0, cls: null, ep: 5, n: 5000 };
+
+  /* ---------- Passage avant recalculé en JavaScript avec les vrais poids du checkpoint ---------- */
+  function conv3(x, cin, cout, H, W, w) {              // x (cin, H, W) -> (cout, H, W), noyau 3x3, padding 1, sans biais
+    const Hp = H + 2, Wp = W + 2, xp = new Float32Array(cin * Hp * Wp), out = new Float32Array(cout * H * W);
+    for (let c = 0; c < cin; c++) for (let y = 0; y < H; y++) for (let xx = 0; xx < W; xx++) xp[(c * Hp + y + 1) * Wp + xx + 1] = x[(c * H + y) * W + xx];
+    for (let o = 0; o < cout; o++) for (let i = 0; i < cin; i++) for (let ky = 0; ky < 3; ky++) for (let kx = 0; kx < 3; kx++) {
+      const wv = w[((o * cin + i) * 3 + ky) * 3 + kx];
+      for (let y = 0; y < H; y++) { const xr = (i * Hp + y + ky) * Wp + kx, orow = (o * H + y) * W; for (let xx = 0; xx < W; xx++) out[orow + xx] += wv * xp[xr + xx]; }
+    }
+    return out;
+  }
+  function bnApply(x, C, HW, mean, vr, gamma, beta, eps) {   // (x - mean) / sqrt(var + eps) * gamma + beta, canal par canal
+    const out = new Float32Array(x.length);
+    for (let c = 0; c < C; c++) { const s = gamma[c] / Math.sqrt(vr[c] + eps), t = beta[c] - mean[c] * s; for (let p = 0; p < HW; p++) out[c * HW + p] = x[c * HW + p] * s + t; }
+    return out;
+  }
+  function pool2(x, C, H, W) {                          // ReLU déjà appliquée ; MaxPool2d(2) -> (C, H/2, W/2)
+    const h = H >> 1, w = W >> 1, out = new Float32Array(C * h * w);
+    for (let c = 0; c < C; c++) for (let y = 0; y < h; y++) for (let xx = 0; xx < w; xx++) {
+      const b = (c * H + 2 * y) * W + 2 * xx;
+      out[(c * h + y) * w + xx] = Math.max(x[b], x[b + 1], x[b + W], x[b + W + 1]);
+    }
+    return out;
+  }
+  const softmax = (z) => { const m = Math.max(...z), e = z.map((v) => Math.exp(v - m)), s = sum(e); return e.map((v) => v / s); };
+  const argmax = (a) => a.indexOf(Math.max(...a));
+
+  function augRaw(label, a) {                            // pixels 0..255 après RandomCrop(32, padding=4) puis retournement
+    const src = D.images[label].pixels, out = new Float32Array(3072);
+    for (let c = 0; c < 3; c++) for (let y = 0; y < 32; y++) for (let x = 0; x < 32; x++) {
+      const sy = y + a.dy, sx = x + a.dx, v = (sy < 0 || sy > 31 || sx < 0 || sx > 31) ? 0 : src[c * 1024 + sy * 32 + sx];
+      out[c * 1024 + y * 32 + (a.flip ? 31 - x : x)] = v;
+    }
+    return out;
+  }
+  function normalize(raw) {
+    const out = new Float32Array(3072), m = D.normalize.mean, s = D.normalize.std;
+    for (let c = 0; c < 3; c++) for (let p = 0; p < 1024; p++) out[c * 1024 + p] = (raw[c * 1024 + p] / 255 - m[c]) / s[c];
+    return out;
+  }
+  function forward(x) {
+    const blocks = D.weights.blocks, res = { conv: [], bn: [], pool: [] };
+    let cur = x, H = 32;
+    blocks.forEach((b) => {
+      const c = conv3(cur, b.cin, b.cout, H, H, b.w), n = bnApply(c, b.cout, H * H, b.mean, b.var, b.gamma, b.beta, b.eps);
+      const r = n.map((v) => (v > 0 ? v : 0)), p = pool2(r, b.cout, H, H);
+      res.conv.push(c); res.bn.push(n); res.pool.push(p); cur = p; H >>= 1;
+    });
+    const HW = H * H, C = blocks[2].cout, pooled = new Float32Array(C);
+    for (let c = 0; c < C; c++) { let s = 0; for (let p = 0; p < HW; p++) s += cur[c * HW + p]; pooled[c] = s / HW; }
+    res.pooled = pooled;
+    res.logits = Array.from({ length: 10 }, (_, k) => { let s = D.weights.linB[k]; for (let j = 0; j < C; j++) s += D.weights.linW[k * C + j] * pooled[j]; return s; });
+    res.probs = softmax(res.logits);
+    return res;
+  }
+  const cache = new Map();
+  function run(label, a) {
+    const key = `${label}|${a.dx}|${a.dy}|${a.flip}`;
+    if (cache.has(key)) return cache.get(key);
+    const raw = augRaw(label, a), x = normalize(raw), res = forward(x);
+    res.raw = raw; res.x = x; cache.set(key, res);
+    if (cache.size > 60) cache.delete(cache.keys().next().value);
+    return res;
+  }
+  const cur = () => run(state.img, state.aug);
+
+  /* ---------- Dessin ---------- */
+  const hex2rgb = (h) => { h = h.trim(); if (h[0] === '#') { if (h.length === 4) h = '#' + [...h.slice(1)].map((c) => c + c).join(''); return [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16)); } const m = h.match(/\d+/g); return m ? m.slice(0, 3).map(Number) : [200, 200, 200]; };
+  function drawRGB(cv, raw) {
+    const ctx = cv.getContext('2d'), id = ctx.createImageData(32, 32);
+    for (let p = 0; p < 1024; p++) { id.data[4 * p] = raw[p]; id.data[4 * p + 1] = raw[1024 + p]; id.data[4 * p + 2] = raw[2048 + p]; id.data[4 * p + 3] = 255; }
+    ctx.putImageData(id, 0, 0);
+  }
+  function drawMap(cv, vals, off) {                     // carte 32x32 divergente (orange positif, bleu négatif), centrée sur 0
+    const ctx = cv.getContext('2d'), id = ctx.createImageData(32, 32), mid = hex2rgb(css('--surface2')), pos = [217, 72, 15], neg = [28, 126, 214];
+    let m = 1e-9; for (let p = 0; p < 1024; p++) m = Math.max(m, Math.abs(vals[off + p]));
+    for (let p = 0; p < 1024; p++) {
+      const t = vals[off + p] / m, tgt = t > 0 ? pos : neg, a = Math.abs(t);
+      for (let k = 0; k < 3; k++) id.data[4 * p + k] = mid[k] + (tgt[k] - mid[k]) * a;
+      id.data[4 * p + 3] = 255;
+    }
+    ctx.putImageData(id, 0, 0);
+  }
+  function marker(cv, x, y) { const ctx = cv.getContext('2d'); ctx.lineWidth = 0.6; ctx.strokeStyle = '#7048e8'; ctx.strokeRect(x - 1 + 0.3, y - 1 + 0.3, 2.4, 2.4); ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 0.2; ctx.strokeRect(x - 1 - 0.05, y - 1 - 0.05, 3.1, 3.1); }
+  function plot(cv, o) {
+    const ctx = cv.getContext('2d'), w = cv.width, h = cv.height, L = 52, R = 10, T = 10, B = 24;
+    ctx.clearRect(0, 0, w, h);
+    const X = (x) => L + (x - o.x0) / (o.x1 - o.x0) * (w - L - R), Y = (y) => T + (1 - (y - o.y0) / (o.y1 - o.y0)) * (h - T - B);
+    ctx.font = '11px system-ui, sans-serif'; ctx.fillStyle = css('--muted'); ctx.strokeStyle = css('--line'); ctx.lineWidth = 1; ctx.setLineDash([]);
+    for (let i = 0; i <= 4; i++) { const v = o.y0 + (o.y1 - o.y0) * i / 4, y = Y(v); ctx.beginPath(); ctx.moveTo(L, y); ctx.lineTo(w - R, y); ctx.stroke(); ctx.fillText(o.yfmt(v), 3, y + 4); }
+    ctx.textAlign = 'center'; o.xticks.forEach((t) => ctx.fillText(String(t), Math.min(w - 16, Math.max(L, X(t))), h - 8)); ctx.textAlign = 'left';
+    o.series.forEach((s) => {
+      ctx.beginPath(); ctx.strokeStyle = s.color; ctx.lineWidth = 2; ctx.setLineDash(s.dash || []);
+      s.xs.forEach((x, i) => { const px = X(x), py = Y(s.ys[i]); if (i) ctx.lineTo(px, py); else ctx.moveTo(px, py); });
+      ctx.stroke(); ctx.setLineDash([]);
+      if (s.dots) s.xs.forEach((x, i) => { ctx.beginPath(); ctx.fillStyle = s.color; ctx.arc(X(x), Y(s.ys[i]), 2.5, 0, 7); ctx.fill(); });
+    });
+    if (o.marker != null) { ctx.strokeStyle = css('--hl'); ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(X(o.marker), T); ctx.lineTo(X(o.marker), h - B); ctx.stroke(); }
+  }
+  function hist(cv, vals, lo, hi, bins, markers) {
+    const ctx = cv.getContext('2d'), w = cv.width, h = cv.height, B = 22, T = 6, counts = new Array(bins).fill(0);
+    vals.forEach((v) => { counts[Math.max(0, Math.min(bins - 1, Math.floor((v - lo) / (hi - lo) * bins)))]++; });
+    const m = Math.max(...counts), bw = w / bins;
+    ctx.clearRect(0, 0, w, h);
+    ctx.fillStyle = css('--accent'); counts.forEach((c, i) => { const bh = c / m * (h - B - T); ctx.fillRect(i * bw + 0.5, h - B - bh, bw - 1, bh); });
+    ctx.strokeStyle = css('--line'); ctx.beginPath(); ctx.moveTo(0, h - B + 0.5); ctx.lineTo(w, h - B + 0.5); ctx.stroke();
+    ctx.font = '11px system-ui, sans-serif'; ctx.fillStyle = css('--muted');
+    [lo, (lo + hi) / 2, hi].forEach((t, i) => ctx.fillText(fr(t, 0), i === 0 ? 2 : i === 2 ? w - 18 : w / 2 - 4, h - 6));
+    markers.forEach((mk) => { const x = (mk.x - lo) / (hi - lo) * w; if (x < 0 || x > w) return; ctx.strokeStyle = mk.color; ctx.lineWidth = 2; ctx.setLineDash(mk.dash || []); ctx.beginPath(); ctx.moveTo(x, T); ctx.lineTo(x, h - B); ctx.stroke(); ctx.setLineDash([]); });
+  }
+  const stat = (lab, val) => `<div class="stat"><b>${val}</b><span>${lab}</span></div>`;
+
+  /* ---------- Image commune ---------- */
+  function buildThumbs() {
+    $('#thumbs').innerHTML = CLS.map((c, i) => `<button class="thumb" data-i="${i}"><canvas width="32" height="32"></canvas><span>${c}</span></button>`).join('');
+    $$('#thumbs button').forEach((b, i) => { drawRGB(b.querySelector('canvas'), Float32Array.from(D.images[i].pixels)); b.addEventListener('click', () => { state.img = i; state.cls = null; renderAll(); }); });
+  }
+  function renderCommon() {
+    $$('#thumbs button').forEach((b, i) => b.classList.toggle('on', i === state.img));
+    const r = cur(), im = D.images[state.img], p = argmax(r.probs), a = state.aug, isId = !a.dx && !a.dy && !a.flip;
+    drawRGB($('#cvMain'), r.raw);
+    const top = r.probs.map((v, i) => [v, i]).sort((x, y) => y[0] - x[0]).slice(0, 3);
+    $('#mainInfo').innerHTML = `<p style="margin:0 0 6px"><b>Classe réelle :</b> ${CLS[im.label]} (image ${im.valIndex} de la découpe de validation). <b>Image envoyée au réseau :</b> ${isId ? 'telle quelle' : `décalée de (${a.dx}, ${a.dy}) pixels${a.flip ? ', retournée' : ''}`}.</p>`
+      + `<p style="margin:0 0 6px"><b>Prédiction du réseau :</b> ${CLS[p]} (${fr(100 * r.probs[p], 1)} %) ${p === im.label ? '<span class="up">✓ juste</span>' : '<span class="down">✗ erreur</span>'}</p>`
+      + top.map(([v, i]) => `<div class="bar-row" style="grid-template-columns:100px 1fr 60px"><span>${CLS[i]}</span><div class="bar"><span style="width:${100 * v}%"></span></div><span class="mono">${fr(100 * v, 1)} %</span></div>`).join('');
+  }
+
+  /* ---------- Section 1 : formes ---------- */
+  function shapesFor(S) {
+    const rows = [['Entrée', [3, S, S], '', '']]; let h = S, bad = null;
+    const ch = [32, 64, 128];
+    for (let b = 0; b < 3; b++) {
+      if (h >> 1 < 1 && !bad) bad = b + 1;
+      const hn = h >> 1;
+      rows.push([`Bloc ${b + 1}`, [ch[b], hn, hn], `Conv (H inchangé), BatchNorm, ReLU, puis MaxPool2d(2) : ${h} → ${hn}`, bad === b + 1 ? 'erreur' : '']);
+      h = hn;
+    }
+    return { rows, bad, h };
+  }
+  function renderS1() {
+    const S = state.sz, { rows, bad, h } = shapesFor(S), real = D.shapeRuns[String(S)];
+    $('#szOut').textContent = `${S} px`;
+    const prod = (sh) => sh.reduce((a, b) => a * b, 1);
+    let html = '<div class="tblwrap"><table class="pt"><tr><th>Étape</th><th>Forme (B, C, H, W)</th><th>Valeurs / image</th><th>Ce qui se passe</th></tr>';
+    rows.forEach((r, i) => {
+      const dead = bad && i >= bad;
+      html += `<tr><td>${r[0]}</td><td class="num">${dead ? 'taille 0' : `(B, ${r[1].join(', ')})`}</td><td class="num">${dead ? '-' : fmtI(prod(r[1]))}</td><td class="wrap2">${i === 0 ? 'Image normalisée' : esc(r[2])}${dead ? ' <span class="down">(refusé par PyTorch)</span>' : ''}</td></tr>`;
+    });
+    if (!bad) html += `<tr><td>Pooling global</td><td class="num">(B, 128, 1, 1)</td><td class="num">128</td><td class="wrap2">AdaptiveAvgPool2d((1, 1)) : moyenne de chaque carte, ${h}×${h} → 1×1</td></tr><tr><td>Flatten</td><td class="num">(B, 128)</td><td class="num">128</td><td class="wrap2">Retire les deux dimensions de taille 1</td></tr><tr><td>Linear(128, 10)</td><td class="num">(B, 10)</td><td class="num">10</td><td class="wrap2">Un score (logit) par classe</td></tr>`;
+    html += '</table></div>';
+    // boîtes de tailles proportionnelles
+    html += '<div class="fm">' + [['entrée', 3, S], ...rows.slice(1).map((r, i) => [`bloc ${i + 1}`, r[1][0], r[1][1]])].filter((_, i) => !bad || i < bad).map((b, i) => `${i ? '<span class="arrow">→</span>' : ''}<span class="box"><i style="width:${Math.max(6, b[2] * 2.2)}px;height:${Math.max(6, b[2] * 2.2)}px"></i><span>${b[0]}</span><span>${b[1]}×${b[2]}×${b[2]}</span></span>`).join('') + '</div>';
+    if (real && real.ok) {
+      const same = JSON.stringify(real.shapes.map((s) => s[1].slice(1)).slice(1, 4)) === JSON.stringify(rows.slice(1).map((r) => r[1]));
+      html += `<p class="chk"><b>${same ? '✓' : '✗'}</b> Exécution réelle de PyTorch (<code>trace_shapes</code>) sur une image ${S}×${S} : ${real.shapes.map((s) => `${s[0]} (${s[1].join(', ')})`).join(' ; ')}. ${same ? 'Identique à la règle de la page.' : 'DIFFÉRENT de la règle de la page.'}</p>`;
+    } else if (real && !real.ok) {
+      html += `<p class="chk"><b>✓</b> Exécution réelle de PyTorch sur ${S}×${S} : <code>RuntimeError: ${esc(real.error)}</code>. Même diagnostic que la page : un MaxPool2d reçoit un tenseur 1×1.</p>`;
+    } else {
+      html += `<p class="chk">Pas d'exécution PyTorch exportée pour ${S}×${S} (tailles exportées : ${Object.keys(D.shapeRuns).join(', ')}) : la forme vient de la règle de la page.</p>`;
+    }
+    $('#s1out').innerHTML = html;
+  }
+
+  /* ---------- Section 2 : une convolution à la main ---------- */
+  const grid3 = (vals, d, scale) => {
+    const m = Math.max(1e-9, ...vals.map(Math.abs));
+    return '<table class="mt g3">' + [0, 1, 2].map((r) => '<tr>' + [0, 1, 2].map((c) => { const v = vals[r * 3 + c], a = Math.round(Math.min(1, Math.abs(v) / (scale || m)) * 70); return `<td class="${a > 45 ? 'hot' : ''}" style="background:color-mix(in srgb, var(${v >= 0 ? '--pos' : '--neg'}) ${a}%, var(--surface))">${fr(v, d)}</td>`; }).join('') + '</tr>').join('') + '</table>';
+  };
+  function renderS2() {
+    const r = cur(), f = state.filt, y = state.py, x = state.px, W = D.weights.blocks[0].w;
+    $('#filtOut').textContent = `${f} / 31`; $('#pyOut').textContent = y; $('#pxOut').textContent = x;
+    drawRGB($('#cvIn'), r.raw); marker($('#cvIn'), x, y);
+    drawMap($('#cvOut'), r.conv[0], f * 1024); marker($('#cvOut'), x, y);
+    let total = 0, html = '<div class="row top">';
+    ['rouge', 'vert', 'bleu'].forEach((name, c) => {
+      const patch = [], wts = [], prod = [];
+      for (let ky = 0; ky < 3; ky++) for (let kx = 0; kx < 3; kx++) {
+        const sy = y + ky - 1, sx = x + kx - 1, v = (sy < 0 || sy > 31 || sx < 0 || sx > 31) ? 0 : r.x[c * 1024 + sy * 32 + sx], w = W[((f * 3 + c) * 3 + ky) * 3 + kx];
+        patch.push(v); wts.push(w); prod.push(v * w);
+      }
+      const s = sum(prod); total += s;
+      html += `<div class="card" style="margin:4px 0;flex:1 1 250px"><h4>Canal ${name}</h4><div class="row" style="gap:10px"><div><div class="muted" style="font-size:.75rem">patch</div>${grid3(patch, 2, 2)}</div><div><div class="muted" style="font-size:.75rem">poids du filtre</div>${grid3(wts, 3)}</div><div><div class="muted" style="font-size:.75rem">produits</div>${grid3(prod, 3)}</div></div><div class="mono">Σ = ${fr(s, 4)}</div></div>`;
+    });
+    html += '</div>';
+    const val = r.conv[0][f * 1024 + y * 32 + x];
+    html += `<p class="verdict">Somme des 27 produits : ${fr(total, 4)} ; valeur de la carte (sortie de Conv2d) : ${fr(val, 4)}. ${Math.abs(total - val) < 1e-3 ? '<span class="up">Identiques.</span>' : '<span class="down">Écart !</span>'}</p>`;
+    $('#s2out').innerHTML = html;
+  }
+
+  /* ---------- Section 3 : comptage des paramètres ---------- */
+  function countParams(c, k, bias) {
+    const rows = []; let cin = 3;
+    c.forEach((co, i) => {
+      rows.push({ n: `Conv2d bloc ${i + 1}`, f: `${co} × ${cin} × ${k} × ${k}${bias ? ` + ${co}` : ''}`, p: co * cin * k * k + (bias ? co : 0), conv: true });
+      rows.push({ n: `BatchNorm2d bloc ${i + 1}`, f: `2 × ${co}`, p: 2 * co });
+      cin = co;
+    });
+    rows.push({ n: 'Linear (tête)', f: `${c[2]} × 10 + 10`, p: c[2] * 10 + 10 });
+    return { rows, total: sum(rows.map((r) => r.p)) };
+  }
+  function renderS3() {
+    const { c, k, bias } = state, { rows, total } = countParams(c, k, bias);
+    ['c1', 'c2', 'c3'].forEach((id, i) => { $('#' + id).value = c[i]; $(`#${id}Out`).textContent = c[i]; });
+    $$('#kBtns button').forEach((b) => b.classList.toggle('on', +b.dataset.k === k)); $('#biasChk').checked = bias;
+    const mx = Math.max(...rows.map((r) => r.p));
+    $('#s3out').innerHTML = rows.map((r) => `<div class="bar-row p3"><span>${r.n}</span><div class="bar ${r.p === mx ? 'big' : ''}"><span style="width:${100 * r.p / mx}%"></span></div><span class="mono">${r.f} = ${fmtI(r.p)} (${fr(100 * r.p / total, 1)} %)</span></div>`).join('')
+      + `<div class="stats"><div class="stat"><b>${fmtI(total)}</b><span>paramètres au total</span></div><div class="stat"><b>${fr(total / D.arch.total, 2)}×</b><span>par rapport au palier (94 762)</span></div><div class="stat"><b>${(total - 60000 >= 0 ? '+' : '') + fmtI(total - 60000)}</b><span>par rapport aux 60 000 prédits</span></div></div>`;
+    const near = Math.abs(total - 60000) <= 1200;
+    $('#s3verdict').innerHTML = near ? '<span class="up">Tu es à moins de 2 % des 60 000 de la prédiction.</span>' : `<span class="muted">Cible : 60 000 ± 1 200 (2 %). Tu es à ${fmtI(Math.abs(total - 60000))} de la cible, soit ${fmtI(Math.abs(total - 60000) - 1200)} hors de la fenêtre.</span>`;
+  }
+  function buildS3() {
+    $('#kBtns').innerHTML = [1, 3, 5, 7].map((k) => `<button data-k="${k}">${k}</button>`).join(' ');
+    $('#kBtns').addEventListener('click', (e) => { const b = e.target.closest('button'); if (!b) return; state.k = +b.dataset.k; renderS3(); });
+    ['c1', 'c2', 'c3'].forEach((id, i) => $('#' + id).addEventListener('input', (e) => { state.c[i] = +e.target.value; renderS3(); }));
+    $('#biasChk').addEventListener('change', (e) => { state.bias = e.target.checked; renderS3(); });
+    $('#pPalier').addEventListener('click', () => { state.c = [32, 64, 128]; state.k = 3; state.bias = false; renderS3(); });
+    $('#pDouble').addEventListener('click', () => { state.c = state.c.map((v) => Math.min(256, v * 2)); renderS3(); });
+    $('#pReveal').addEventListener('click', () => { state.c = D.mission.solution.slice(); state.k = 3; state.bias = false; renderS3(); });
+    $('#s3grid').innerHTML = '<table class="pt"><tr><th>Canaux</th><th>Noyau</th><th>Biais</th><th>Total PyTorch</th><th>Total de la formule</th><th></th></tr>' + D.paramsGrid.map((g) => { const t = countParams(g.c, g.k, g.bias).total; return `<tr><td class="num">${g.c.join(', ')}</td><td class="num">${g.k}</td><td>${g.bias ? 'oui' : 'non'}</td><td class="num">${fmtI(g.total)}</td><td class="num">${fmtI(t)}</td><td>${t === g.total ? '<span class="up">✓</span>' : '<span class="down">✗</span>'}</td></tr>`; }).join('') + '</table>';
+    const sd = D.stateDict, extra = sd.elements - D.arch.total, cv = D.checkpointVal, ref = D.runs[3];
+    $('#s3state').innerHTML = `<div class="stats">${stat('paramètres appris (<code>parameters()</code>)', fmtI(D.arch.total))}${stat('éléments dans <code>state_dict()</code> (' + sd.keys + ' tenseurs)', fmtI(sd.elements))}${stat('taille du fichier checkpoint (octets)', fmtI(D.checkpoint.bytes))}</div>`
+      + `<p>Les ${fmtI(extra)} éléments de différence sont les statistiques de BatchNorm : <code>running_mean</code> et <code>running_var</code> (2 × 224 = 448 valeurs) et un compteur <code>num_batches_tracked</code> par BatchNorm (3 valeurs). Ils ne sont pas appris par l'optimiseur, mais sans eux le réseau en mode eval ne donnerait pas les mêmes sorties : ils sont donc dans le fichier.</p>`
+      + `<p class="chk"><b>✓</b> Le checkpoint présent, rechargé sur CPU puis évalué sur les ${fmtI(cv.n)} images de validation par le script d'export, donne <b>${fr(100 * cv.val_acc, 2)} %</b> et une perte de ${fr(cv.val_loss, 4)} : ce sont les chiffres de la graine 2 du rapport (${fr(100 * ref.val_acc, 2)} %, ${fr(ref.val_loss, 4)}). Les poids affichés dans cette page sont donc ceux de la graine 2.</p>`;
+  }
+
+  /* ---------- Section 4 : BatchNorm ---------- */
+  let conv1All = null;
+  function renderS4() {
+    if (!conv1All) conv1All = D.images.map((_, i) => run(i, ID).conv[0]);
+    const { bnCh: ch, bnK: k, bnMode: mode, bnB: b } = state, blk = D.weights.blocks[0];
+    $('#bnChOut').textContent = ch; $('#bnKOut').textContent = k; $('#bnBOut').textContent = fr(b, 1);
+    $('#bnTrain').classList.toggle('on', mode === 'train'); $('#bnEval').classList.toggle('on', mode === 'eval');
+    const vals = []; for (let i = 0; i < k; i++) for (let p = 0; p < 1024; p++) vals.push(conv1All[i][ch * 1024 + p]);
+    const m0 = sum(vals) / vals.length, v0 = sum(vals.map((v) => (v - m0) ** 2)) / vals.length;
+    const mu = mode === 'train' ? m0 : blk.mean[ch], va = mode === 'train' ? v0 : blk.var[ch], s = blk.gamma[ch] / Math.sqrt(va + blk.eps);
+    // train : la moyenne du lot contient le décalage ((m0 + b) est retirée de (v + b)) ; eval : les statistiques sont figées
+    const muB = mode === 'train' ? m0 + b : mu;
+    const yShow = vals.map((v) => (v + b - muB) * s + blk.beta[ch]), y0 = vals.map((v) => (v - mu) * s + blk.beta[ch]);
+    const dShow = Math.max(...yShow.map((v, i) => Math.abs(v - y0[i])));
+    hist($('#cvBn1'), vals.map((v) => v + b), -6, 6, 80, [{ x: (mode === 'train' ? m0 + b : mu), color: css('--hl'), dash: [4, 3] }]);
+    hist($('#cvBn2'), yShow, -8, 8, 64, [{ x: blk.beta[ch], color: css('--hl'), dash: [4, 3] }]);
+    $('#s4out').innerHTML = `<div class="stats">${stat(mode === 'train' ? 'μ utilisé (moyenne du lot, avec b)' : 'μ utilisé (running_mean)', fr(mode === 'train' ? m0 + b : mu, 3))}${stat(mode === 'train' ? 'σ² utilisé (variance du lot)' : 'σ² utilisé (running_var)', fr(va, 3))}${stat('γ appris', fr(blk.gamma[ch], 3))}${stat('β appris', fr(blk.beta[ch], 3))}</div>`
+      + `<p class="verdict">Écart maximal de la sortie par rapport à b = 0 : <span class="${dShow > 1e-3 ? 'down' : 'up'}">${dShow < 1e-6 ? '0' : fr(dShow, 3)}</span></p>`
+      + `<p class="muted">${mode === 'train' ? 'Mode train : la moyenne du lot suit le décalage b, la sortie ne bouge pas (la ligne violette de gauche suit le décalage ; celle de droite reste sur β).' : `Mode eval : les statistiques sont figées (apprises pendant l'entraînement) ; un décalage b déplace toute la sortie de b · γ/σ = ${fr(b * s, 2)}.`} Le lot compte ${fmtI(vals.length)} valeurs (${k} image${k > 1 ? 's' : ''} × 1 024 positions).</p>`;
+  }
+  function renderS4static() {
+    const B = D.bn, d = B.dryPass;
+    let batch0 = 0; { const v = []; for (let i = 0; i < 10; i++) for (let p = 0; p < 1024; p++) v.push(run(i, ID).conv[0][p]); batch0 = sum(v) / v.length; }
+    $('#s4dry').innerHTML = `<p>À chaque passage en mode train, BatchNorm met à jour : <code>running_mean ← 0,9 × running_mean + 0,1 × moyenne_du_lot</code> (momentum 0,1), et de même pour la variance. Contrôle par PyTorch sur un BatchNorm tout neuf (running_mean = 0) et les 10 images : après un passage, <code>running_mean[0]</code> = ${fr(B.freshRunningMean0, 5)} ; la page calcule 0,1 × ${fr(batch0, 5)} = ${fr(0.1 * batch0, 5)} <span class="up">✓</span>.</p>`
+      + `<p>Sur le vrai checkpoint (script d'export, copie du modèle) : un seul passage de <b>2 images en mode train</b>, comme le ferait un passage à vide sans <code>model.eval()</code>, fait passer <code>running_mean[0]</code> du bloc 1 de ${fr(d.runningMean0Before, 4)} à ${fr(d.runningMean0After, 4)}. Puis, en mode eval, la précision de validation (5 000 images) passe de <b>${fr(100 * d.valAccBefore, 2)} %</b> à <b>${fr(100 * d.valAccAfter, 2)} %</b> (perte ${fr(D.checkpointVal.val_loss, 4)} → ${fr(d.valLossAfter, 4)}). Les poids γ et β, eux, n'ont pas bougé (écart maximal ${sci(d.gammaBetaMaxDiff)} sur les 3 BatchNorm) : seules les statistiques ont été touchées.</p>`;
+  }
+
+  /* ---------- Section 5 : la tête ---------- */
+  function renderS5() {
+    const r = cur(), im = D.images[state.img], c = state.cls == null ? argmax(r.probs) : state.cls, C = 128, lw = D.weights.linW;
+    // barres des 128 canaux
+    const cv = $('#cvPool'), ctx = cv.getContext('2d'), w = cv.width, h = cv.height, mx = Math.max(...r.pooled) || 1, bw = (w - 8) / C;
+    ctx.clearRect(0, 0, w, h);
+    const contrib = Array.from({ length: C }, (_, j) => lw[c * C + j] * r.pooled[j]);
+    const top = contrib.map((v, j) => [v, j]).sort((a, b) => Math.abs(b[0]) - Math.abs(a[0])).slice(0, 6), topSet = new Set(top.map((t) => t[1]));
+    for (let j = 0; j < C; j++) { const bh = r.pooled[j] / mx * (h - 22); ctx.fillStyle = topSet.has(j) ? (contrib[j] >= 0 ? css('--accent') : css('--neg')) : css('--line'); ctx.fillRect(4 + j * bw, h - 16 - bh, bw - 1, bh); }
+    ctx.fillStyle = css('--muted'); ctx.font = '11px system-ui, sans-serif'; ctx.fillText('canal 0', 4, h - 3); ctx.fillText('canal 127', w - 54, h - 3);
+    // classes
+    const mp = Math.max(...r.probs);
+    $('#cls').innerHTML = CLS.map((n, i) => `<div class="bar-row pickable ${i === c ? 'sel' : ''}" data-c="${i}"><span>${n}${i === im.label ? ' (réelle)' : ''}</span><div class="bar"><span style="width:${100 * r.probs[i] / mp}%"></span></div><span class="mono">logit ${(r.logits[i] >= 0 ? '+' : '') + fr(r.logits[i], 2)} · ${fr(100 * r.probs[i], 1)} %</span></div>`).join('');
+    // décomposition
+    const rest = sum(contrib) - sum(top.map((t) => t[0])), bias = D.weights.linB[c];
+    $('#s5dec').innerHTML = `<h4 style="margin:12px 0 4px">Pourquoi ${CLS[c]} ? Les 6 canaux qui pèsent le plus</h4><div class="tblwrap"><table class="pt"><tr><th>Canal j</th><th>Valeur après pooling</th><th>Poids Linear</th><th>Produit</th></tr>`
+      + top.map(([v, j]) => `<tr><td class="num">${j}</td><td class="num">${fr(r.pooled[j], 3)}</td><td class="num">${fr(lw[c * C + j], 3)}</td><td class="num ${v >= 0 ? 'up' : 'down'}">${fr(v, 3)}</td></tr>`).join('')
+      + `<tr><td>les 122 autres</td><td></td><td></td><td class="num">${fr(rest, 3)}</td></tr><tr><td>biais</td><td></td><td></td><td class="num">${fr(bias, 3)}</td></tr><tr><td><b>logit</b></td><td></td><td></td><td class="num"><b>${fr(sum(contrib) + bias, 3)}</b></td></tr></table></div>`;
+  }
+  function buildS5() {
+    $('#cls').addEventListener('click', (e) => { const r = e.target.closest('.bar-row'); if (!r) return; state.cls = +r.dataset.c; renderS5(); });
+    const rows = [32, 30, 64].map((S) => { const h = shapesFor(S).h, n = 128 * h * h; return `<tr><td class="num">${S}×${S}</td><td class="num">${h}×${h}</td><td class="num">128</td><td class="num">${fmtI(128 * 10 + 10)}</td><td class="num">${fmtI(n)}</td><td class="num">${fmtI(n * 10 + 10)}</td></tr>`; });
+    $('#s5table').innerHTML = '<table class="pt"><tr><th>Image</th><th>Carte après bloc 3</th><th>Entrées de Linear (pooling global)</th><th>Poids de Linear (pooling global)</th><th>Entrées de Linear (Flatten direct)</th><th>Poids de Linear (Flatten direct)</th></tr>' + rows.join('') + '</table>';
+  }
+
+  /* ---------- Section 6 : augmentation ---------- */
+  function renderS6() {
+    const a = state.aug, im = D.images[state.img], r0 = run(state.img, ID), r1 = cur();
+    $('#dxOut').textContent = a.dx; $('#dyOut').textContent = a.dy; $('#dx').value = a.dx; $('#dy').value = a.dy; $('#flip').checked = a.flip;
+    drawRGB($('#cvOrig'), r0.raw); drawRGB($('#cvAug'), r1.raw);
+    const info = (r) => { const p = argmax(r.probs); return `${CLS[p]} (${fr(100 * r.probs[p], 1)} %) ${p === im.label ? '<span class="up">✓</span>' : '<span class="down">✗</span>'}`; };
+    $('#origInfo').innerHTML = 'Réseau : ' + info(r0); $('#augInfo').innerHTML = 'Réseau : ' + info(r1);
+    $('#s6out').innerHTML = `<p class="muted">Variantes possibles par image : 9 décalages en x × 9 en y × 2 retournements = ${9 * 9 * 2}. Sur 15 époques, une image n'en voit au plus que 15 (tirées au hasard à chaque époque). Le réseau de cette page a été entraîné avec cette augmentation.</p>`;
+    $('#s6table').innerHTML = '<table class="pt"><tr><th>Jeu</th><th>Images</th><th>Transformation</th><th>Quand est-il lu ?</th></tr>'
+      + '<tr><td>Entraînement</td><td class="num">45 000</td><td class="wrap2">RandomCrop(32, padding=4), RandomHorizontalFlip, normalisation</td><td class="wrap2">À chaque époque (352 lots de 128)</td></tr>'
+      + '<tr><td>Validation</td><td class="num">5 000</td><td class="wrap2">Normalisation seulement</td><td class="wrap2">À la fin de chaque époque ; pour les décisions</td></tr>'
+      + '<tr><td>Test</td><td class="num">10 000</td><td class="wrap2">Normalisation seulement</td><td class="wrap2">Une fois par run final, avec <code>--test</code></td></tr></table>';
+  }
+
+  /* ---------- Section 7 : entraînement ---------- */
+  function renderS7() {
+    const e = state.ep, S = D.schedule, nb = S.batchesPerEpoch, hs = D.run.history, h = hs[e - 1];
+    $('#epOut').textContent = `${e} / 15`;
+    const step = (i) => i;
+    plot($('#cvLr'), { x0: 0, x1: S.lr.length, y0: 0, y1: 0.0035, yfmt: (v) => fr(v * 1000, 2) + 'e-3', xticks: [0, 1056, 2112, 3168, 4224, 5280], marker: e * nb - nb / 2, series: [{ xs: S.lr.map((_, i) => i), ys: S.lr, color: css('--accent') }] });
+    const eps = hs.map((x) => x.epoch);
+    plot($('#cvLoss'), { x0: 1, x1: 15, y0: 0.4, y1: 2, yfmt: (v) => fr(v, 1), xticks: [1, 5, 10, 15], marker: e, series: [{ xs: eps, ys: hs.map((x) => x.train_loss), color: css('--accent'), dots: true }, { xs: eps, ys: hs.map((x) => x.val_loss), color: css('--hl'), dots: true }] });
+    plot($('#cvAcc'), { x0: 1, x1: 15, y0: 0.3, y1: 0.9, yfmt: (v) => fr(100 * v, 0) + ' %', xticks: [1, 5, 10, 15], marker: e, series: [{ xs: eps, ys: hs.map((x) => x.val_acc), color: css('--ok'), dots: true }] });
+    const lr0 = S.lr[(e - 1) * nb], lr1 = S.lr[e * nb - 1], b0 = S.beta1[(e - 1) * nb], b1 = S.beta1[e * nb - 1], last = hs[hs.length - 1], rep = D.runs[0];
+    $('#s7out').innerHTML = `<div class="stats">${stat('taux au 1er pas de l\'époque', lr0.toExponential(2).replace('.', ','))}${stat('taux au dernier pas', lr1.toExponential(2).replace('.', ','))}${stat('beta1 (début → fin)', fr(b0, 3) + ' → ' + fr(b1, 3))}${stat('perte d\'entraînement', fr(h.train_loss, 4))}${stat('perte de validation', fr(h.val_loss, 4))}${stat('précision de validation', fr(100 * h.val_acc, 2) + ' %')}</div>`
+      + `<p class="muted">Pic du taux au pas ${fmtI(S.peakStep)} sur ${fmtI(S.lr.length)} (époque ${Math.floor(S.peakStep / nb) + 1}) ; taux de départ ${S.lr[0].toExponential(1).replace('.', ',')}, taux final ${S.lr[S.lr.length - 1].toExponential(1).replace('.', ',')}. OneCycleLR fait aussi varier beta1 d'AdamW (de ${fr(Math.min(...S.beta1), 2)} à ${fr(Math.max(...S.beta1), 2)}) : mesuré sur le vrai planning. La perte d'entraînement est moyennée pendant l'époque, en mode train et sur images augmentées ; celle de validation est mesurée à la fin de l'époque, en mode eval, sur images brutes : les deux courbes ne mesurent pas la même chose.</p>`
+      + `<p class="chk"><b>Provenance :</b> courbe d'un run de graine 0 relancé pour cette page (validation seulement, ${D.run.device}, ${fr(D.run.train_seconds, 0)} s). Résultat final : ${fr(100 * last.val_acc, 2)} % et perte ${fr(last.val_loss, 4)} ; le rapport donne ${fr(100 * rep.val_acc, 2)} % et ${fr(rep.val_loss, 4)} pour la graine 0 ${Math.abs(last.val_acc - rep.val_acc) < 1e-9 && Math.abs(last.val_loss - rep.val_loss) < 1e-4 ? '<b>(identiques)</b>' : '(différents : mps n\'est pas déterministe bit à bit)'}.</p>`;
+  }
+
+  /* ---------- Section 8 : résultats ---------- */
+  const mean = (a) => sum(a) / a.length, sd = (a) => Math.sqrt(sum(a.map((v) => (v - mean(a)) ** 2)) / (a.length - 1));
+  function renderS8() {
+    const runs = D.runs, final = runs.filter((r) => r.test_acc != null), va = final.map((r) => r.val_acc), ta = final.map((r) => r.test_acc), vl = final.map((r) => r.val_loss), tl = final.map((r) => r.test_loss);
+    if (!$('#s8runs').innerHTML) {
+      $('#s8runs').innerHTML = '<table class="pt"><tr><th>Run</th><th>val_acc</th><th>val_loss</th><th>test_acc</th><th>test_loss</th><th>Durée (s)</th></tr>' + runs.map((r, i) => `<tr><td>${r.test_acc == null ? 'graine 0 (exploration, sans --test)' : 'graine ' + r.seed + ' (--test)'}</td><td class="num">${fr(100 * r.val_acc, 2)} %</td><td class="num">${fr(r.val_loss, 4)}</td><td class="num">${r.test_acc == null ? '-' : fr(100 * r.test_acc, 2) + ' %'}</td><td class="num">${r.test_acc == null ? '-' : fr(r.test_loss, 4)}</td><td class="num">${fr(r.train_seconds, 1)}</td></tr>`).join('')
+        + `<tr><td><b>Moyenne des 3 graines retenues ± écart-type</b></td><td class="num"><b>${fr(100 * mean(va), 2)} ± ${fr(100 * sd(va), 2)}</b></td><td class="num">${fr(mean(vl), 4)}</td><td class="num"><b>${fr(100 * mean(ta), 2)} ± ${fr(100 * sd(ta), 2)}</b></td><td class="num">${fr(mean(tl), 4)}</td><td class="num">${fr(mean(final.map((r) => r.train_seconds)), 1)}</td></tr></table>`;
+    }
+    const n = state.n, pv = mean(va), pt = mean(ta), se = (p, m) => Math.sqrt(p * (1 - p) / m);
+    $('#nImgOut').textContent = fmtI(n);
+    $('#s8stats').innerHTML = `<div class="stats">${stat('écart val - test (points)', fr(100 * (pv - pt), 2))}${stat('écart-type entre graines, val / test (points)', fr(100 * sd(va), 2) + ' / ' + fr(100 * sd(ta), 2))}${stat('incertitude de tirage, val (n = 5 000)', '±' + fr(100 * se(pv, 5000), 2))}${stat('incertitude de tirage, test (n = 10 000)', '±' + fr(100 * se(pt, 10000), 2))}</div>`;
+    // axe SVG
+    const lo = 75.5, hi = 80.6, W = 640, L = 190, X = (v) => L + (v - lo) / (hi - lo) * (W - L - 10);
+    const rowsSvg = [['validation : entre graines', pv, sd(va), 'var(--accent)'], ['validation : tirage (n = 5 000)', pv, se(pv, 5000), 'var(--accent)'], ['test : entre graines', pt, sd(ta), 'var(--hl)'], ['test : tirage (n = 10 000)', pt, se(pt, 10000), 'var(--hl)'], [`tirage pour n = ${fmtI(n)}`, pv, se(pv, n), 'var(--muted)']];
+    let svg = `<svg viewBox="0 0 ${W} 200" width="100%" style="max-width:${W}px;display:block;font:13px system-ui,sans-serif"><g stroke="var(--line)">`;
+    for (let t = 76; t <= 80; t++) svg += `<line x1="${X(t)}" x2="${X(t)}" y1="8" y2="168"/>`;
+    svg += '</g><g fill="var(--muted)">';
+    for (let t = 76; t <= 80; t++) svg += `<text x="${X(t) - 14}" y="188">${t} %</text>`;
+    svg += '</g>';
+    rowsSvg.forEach(([lab, m, e, col], i) => { const y = 24 + i * 32; svg += `<text x="4" y="${y + 4}" fill="var(--text)">${lab}</text><line x1="${X(100 * m - 100 * e)}" x2="${X(100 * m + 100 * e)}" y1="${y}" y2="${y}" stroke="${col}" stroke-width="6" stroke-linecap="round" opacity=".55"/><circle cx="${X(100 * m)}" cy="${y}" r="4" fill="${col}"/>`; });
+    svg += '</svg>';
+    $('#s8svg').innerHTML = svg;
+    const need = pv * (1 - pv) / 0.001 ** 2;
+    $('#s8read').innerHTML = `Sur ${fmtI(n)} images : ±${fr(100 * se(pv, n), 2)} point. L'écart val/test (${fr(100 * (pv - pt), 2)}) ${pv - pt < Math.sqrt(se(pv, 5000) ** 2 + se(pt, 10000) ** 2) ? 'reste plus petit que l\'incertitude combinée de tirage (' + fr(100 * Math.sqrt(se(pv, 5000) ** 2 + se(pt, 10000) ** 2), 2) + ')' : 'dépasse l\'incertitude combinée de tirage'}. Descendre à ±0,1 point demanderait environ ${fmtI(Math.round(need / 1000) * 1000)} images.`;
+    const secs = runs.map((r) => r.train_seconds), em = runs.map((r) => [Math.min(...r.epoch_seconds), Math.max(...r.epoch_seconds)]);
+    $('#s8time').innerHTML = `<p>Même configuration, même machine : durée totale de ${fr(Math.min(...secs), 1)} s à ${fr(Math.max(...secs), 1)} s selon le run (facteur ${fr(Math.max(...secs) / Math.min(...secs), 1)}). Durée d'une époque : de ${fr(Math.min(...em.map((x) => x[0])), 1)} s à ${fr(Math.max(...em.map((x) => x[1])), 1)} s. Le rapport retient ${fr(mean(final.map((r) => r.train_seconds)), 1)} s en moyenne sur les 3 runs finaux ; il n'établit pas la cause de la variation.</p>`;
+    $('#s8pred').innerHTML = `<div class="tblwrap"><table class="pt"><tr><th></th><th>Prédit</th><th>Mesuré</th></tr><tr><td>Précision</td><td class="num">78 %</td><td class="num">${fr(100 * pv, 2)} % (val) ; ${fr(100 * pt, 2)} % (test)</td></tr><tr><td>Paramètres</td><td class="num">60 000</td><td class="num">${fmtI(D.arch.total)} (${fr(D.arch.total / 60000, 2)}×)</td></tr></table></div><p class="muted" style="margin-top:8px">Une prédiction de précision bien placée ne dit rien sur celle du nombre de paramètres : ce sont deux estimations indépendantes.</p>`;
+  }
+
+  /* ---------- Rendus ---------- */
+  function renderAll() { if (!HAS) return; renderCommon(); renderS1(); renderS2(); renderS3(); renderS4(); renderS5(); renderS6(); renderS7(); renderS8(); }
+
+  /* ---------- Branchements ---------- */
+  if (HAS) {
+    buildThumbs(); buildS3(); buildS5();
+    $('#sz').addEventListener('input', (e) => { state.sz = +e.target.value; renderS1(); });
+    $$('button[data-sz]').forEach((b) => b.addEventListener('click', () => { state.sz = +b.dataset.sz; $('#sz').value = state.sz; renderS1(); }));
+    const pos = (e, cv) => { const r = cv.getBoundingClientRect(); state.px = Math.max(0, Math.min(31, Math.floor((e.clientX - r.left) / r.width * 32))); state.py = Math.max(0, Math.min(31, Math.floor((e.clientY - r.top) / r.height * 32))); $('#px').value = state.px; $('#py').value = state.py; renderS2(); };
+    $('#cvIn').addEventListener('click', (e) => pos(e, $('#cvIn'))); $('#cvOut').addEventListener('click', (e) => pos(e, $('#cvOut')));
+    $('#filt').addEventListener('input', (e) => { state.filt = +e.target.value; renderS2(); });
+    $('#py').addEventListener('input', (e) => { state.py = +e.target.value; renderS2(); }); $('#px').addEventListener('input', (e) => { state.px = +e.target.value; renderS2(); });
+    $('#bnCh').addEventListener('input', (e) => { state.bnCh = +e.target.value; renderS4(); }); $('#bnK').addEventListener('input', (e) => { state.bnK = +e.target.value; renderS4(); });
+    $('#bnB').addEventListener('input', (e) => { state.bnB = +e.target.value; renderS4(); });
+    $('#bnTrain').addEventListener('click', () => { state.bnMode = 'train'; renderS4(); }); $('#bnEval').addEventListener('click', () => { state.bnMode = 'eval'; renderS4(); });
+    const setAug = (a) => { state.aug = a; state.cls = null; renderAll(); };
+    $('#dx').addEventListener('input', (e) => setAug({ ...state.aug, dx: +e.target.value })); $('#dy').addEventListener('input', (e) => setAug({ ...state.aug, dy: +e.target.value }));
+    $('#flip').addEventListener('change', (e) => setAug({ ...state.aug, flip: e.target.checked }));
+    $('#augRand').addEventListener('click', () => setAug({ dx: Math.floor(Math.random() * 9) - 4, dy: Math.floor(Math.random() * 9) - 4, flip: Math.random() < 0.5 }));
+    $('#augReset').addEventListener('click', () => setAug({ ...ID }));
+    $('#ep').addEventListener('input', (e) => { state.ep = +e.target.value; renderS7(); });
+    $('#nImg').addEventListener('input', (e) => { state.n = +e.target.value; renderS8(); });
+    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', renderAll);
+    // Contrôles contre PyTorch (affichés dans les sections concernées)
+    { const r0 = run(0, ID), cc = D.conv1Check; let m = 0;
+      cc.positions.forEach(([py, px], i) => cc.values[i].forEach((v, ch) => { m = Math.max(m, Math.abs(r0.conv[0][ch * 1024 + py * 32 + px] - v)); }));
+      $('#s2chk').innerHTML = `<b>✓</b> Contrôle contre PyTorch : la convolution recalculée par la page sur l'image « ${CLS[0]} » (non décalée) diffère de la sortie de PyTorch de ${sci(m)} au plus, sur ${cc.positions.length * 32} valeurs (4 positions, 32 filtres).`;
+      let ml = 0; D.images.forEach((im, i) => { const r = run(i, ID); r.logits.forEach((v, k) => { ml = Math.max(ml, Math.abs(v - im.logits[k])); }); });
+      state.logitCheck = ml; }
+    renderS4static();
+    renderAll();
+    $('#s5chk').innerHTML = `<b>✓</b> Contrôle contre PyTorch : sur les 10 images (non décalées), les 10 logits recalculés par la page diffèrent de ceux de PyTorch de ${sci(state.logitCheck)} au plus. Sur ces 10 images, le passage avant recalculé du pixel au logit suit donc celui de PyTorch.`;
+  }
+
+  /* ---------- Quiz : 10 questions ---------- */
+  const QUIZ = [
+    { q: "Une image de forme (B, 3, 50, 50) entre dans CifarCNN. Quelle est la forme de la sortie du bloc 3 ?", ref: '#s1',
+      o: [
+        { t: "(B, 128, 6, 6)", ok: true, why: "50 → 25 → 12 → 6 : chaque MaxPool2d(2) divise par 2 en arrondissant vers le bas, comme 30 → 15 → 7 → 3 dans la section 1." },
+        { t: "(B, 128, 7, 7)", ok: false, why: "Ce serait un arrondi vers le haut (50 / 8 = 6,25). MaxPool2d tronque : une ligne ou colonne en trop est perdue." },
+        { t: "(B, 128, 4, 4)", ok: false, why: "C'est la forme pour 32×32. La taille spatiale suit l'entrée : rien avant le pooling global ne la ramène à 4×4." },
+        { t: "(B, 128, 12, 12)", ok: false, why: "Cela ne compte que deux divisions (50 → 25 → 12). Il y a trois blocs, donc trois MaxPool2d." },
+      ] },
+    { q: "Conv2d(3, 32, kernel_size=3, padding=1, bias=False) est la première couche. Lesquelles de ces affirmations sont vraies ?", multi: true, ref: '#s2',
+      o: [
+        { t: "Chaque filtre possède 27 poids : un patch 3×3 par canal de couleur", ok: true, why: "c_in × k × k = 3 × 3 × 3 = 27 : les 27 produits de la section 2, un patch par canal rouge, vert, bleu." },
+        { t: "La couche compte 864 poids et laisse H et W inchangés", ok: true, why: "32 filtres × 27 poids = 864 ; avec padding=1 et noyau 3, la taille de sortie est celle de l'entrée." },
+        { t: "Un même noyau de 9 poids est appliqué aux canaux rouge, vert et bleu", ok: false, why: "Chaque canal d'entrée a ses propres 9 poids dans le filtre : les 27 poids sont distincts, c'est ce que la page affiche en trois grilles." },
+        { t: "La couche ajoute 32 biais, un par filtre, aux 864 poids", ok: false, why: "bias=False : il n'y a pas de terme constant. Le compte de la couche est de 864 paramètres, pas 896." },
+      ] },
+    { q: "Combien de poids contient Conv2d(64, 128, kernel_size=3, bias=False), la convolution du bloc 3 ?", ref: '#s3',
+      o: [
+        { t: "73 728", ok: true, why: "128 × 64 × 3 × 3 = 73 728 : c_out × c_in × k × k, soit 77,8 % des 94 762 paramètres." },
+        { t: "8 192", ok: false, why: "Oublie le noyau : 128 × 64 = 8 192, sans le facteur 3 × 3 = 9." },
+        { t: "73 856", ok: false, why: "Ajoute 128 biais à 73 728, mais la convolution est créée avec bias=False." },
+        { t: "18 432", ok: false, why: "C'est le bloc 2 (32 → 64 canaux : 64 × 32 × 9), pas le bloc 3." },
+      ] },
+    { q: "Jean prévoyait environ 60 000 paramètres ; le réseau en compte 94 762. Qu'est-ce qui explique le mieux l'écart ?", trap: true, ref: '#s3',
+      o: [
+        { t: "Les poids des convolutions croissent avec le produit des canaux", ok: true, why: "Le bloc 3 (64 → 128 canaux) pèse à lui seul 73 728 poids. Doubler tous les canaux multiplie le total par près de 4, pas par 2." },
+        { t: "Les paramètres de BatchNorm doublent les poids des convolutions", ok: false, why: "BatchNorm n'ajoute que 2 par canal, soit 448 au total : moins de 0,5 % du réseau." },
+        { t: "La couche Linear de la tête concentre l'essentiel des paramètres", ok: false, why: "Linear(128, 10) compte 1 290 paramètres, environ 1,4 % du total : c'est la dernière convolution qui domine." },
+        { t: "Le biais de chaque convolution ajoute des dizaines de milliers de poids", ok: false, why: "Les convolutions ont bias=False ; avec bias=True le total passerait de 94 762 à 94 986 seulement (+224)." },
+      ] },
+    { q: "Pourquoi les convolutions du palier sont-elles créées avec bias=False ?", trap: true, ref: '#s4',
+      o: [
+        { t: "La BatchNorm qui suit soustrait la moyenne du canal, ce qui annule tout décalage constant", ok: true, why: "En mode train, la moyenne du lot suit le décalage : la sortie reste la même (écart de l'ordre de 4e-6 mesuré par PyTorch). Le biais serait du poids mort." },
+        { t: "PyTorch interdit un biais devant une BatchNorm et lèverait une erreur de construction", ok: false, why: "C'est autorisé : la page construit des réseaux avec bias=True, ils comptent simplement 224 paramètres de plus." },
+        { t: "Un biais ferait diverger le calcul du gradient dans la BatchNorm pendant l'entraînement", ok: false, why: "Il ne fait rien diverger : il est simplement inutile, et le réseau reste correct avec." },
+        { t: "C'est une économie de paramètres qui compense la perte de précision sans biais", ok: false, why: "Il n'y a pas de perte de précision à compenser : le biais est redondant avec β de la BatchNorm, pas un gain de précision sacrifié." },
+      ] },
+    { q: "La ligne 86 du palier appelle model.eval() avant de faire passer 2 images pour afficher les formes. Pourquoi ?", trap: true, ref: '#s4',
+      o: [
+        { t: "En mode train, BatchNorm mettrait à jour running_mean et running_var avec 2 images", ok: true, why: "Mesuré par PyTorch (script d'export) : un seul passage de 2 images en mode train fait chuter la précision de validation de 78,52 % à 77,50 %." },
+        { t: "En mode train, ce passage modifierait aussi les poids γ et β de la BatchNorm", ok: false, why: "γ et β ne changent que par l'optimiseur. Seules les statistiques mobiles bougent lors d'un simple passage avant." },
+        { t: "En mode train, la BatchNorm refuserait un lot de seulement 2 images", ok: false, why: "Le passage fonctionne sans erreur : le danger est silencieux, ce sont les statistiques qui se dégradent." },
+        { t: "En mode train, le MaxPool2d choisirait ses fenêtres au hasard et fausserait les formes", ok: false, why: "MaxPool2d est déterministe dans les deux modes. Seules BatchNorm (et Dropout, absent ici) se comportent différemment." },
+      ] },
+    { q: "À propos de AdaptiveAvgPool2d((1, 1)) suivi de Linear(128, 10), lesquelles sont vraies ?", multi: true, ref: '#s5',
+      o: [
+        { t: "La tête reçoit 128 valeurs, quelle que soit la taille de l'image", ok: true, why: "Chaque carte est moyennée en une valeur : le nombre d'entrées de Linear ne dépend que des 128 canaux (section 1 : le réseau accepte 30×30 ou 64×64)." },
+        { t: "Avec Flatten direct sur 4×4, Linear aurait 2 048 entrées et 20 490 paramètres", ok: true, why: "128 × 4 × 4 = 2 048 entrées, 2 048 × 10 + 10 = 20 490 poids, contre 1 290 avec le pooling global ; et cela ne fonctionnerait que pour les images de 32 à 39 pixels de côté." },
+        { t: "Le pooling global calcule aussi une moyenne entre les 128 canaux de l'image", ok: false, why: "Il moyenne chaque carte séparément, sur sa hauteur et sa largeur : les 128 canaux restent distincts, sinon il ne resterait qu'un nombre." },
+        { t: "Le pooling global ajoute 128 poids appris, un par canal, qui pondèrent les cartes", ok: false, why: "Une moyenne n'a aucun paramètre appris : tout le vote est porté par les 1 290 paramètres de Linear." },
+      ] },
+    { q: "Pourquoi cifar10_loaders crée-t-il deux instances de datasets.CIFAR10 pour l'entraînement et la validation ?", trap: true, ref: '#s6',
+      o: [
+        { t: "L'une est augmentée et l'autre non, avec les mêmes indices de découpe", ok: true, why: "Les indices de val viennent de la même découpe (graine 1234) : la validation est disjointe de l'entraînement mais vue sans aléa." },
+        { t: "Pour doubler le nombre d'images d'entraînement en dupliquant le jeu", ok: false, why: "Les deux instances portent sur les mêmes 50 000 images, avec des indices disjoints : aucune image n'est ajoutée." },
+        { t: "Parce que le jeu test doit être chargé en même temps que la validation", ok: false, why: "Le test vient d'une fonction séparée, cifar10_test_loader, appelée seulement avec --test." },
+        { t: "Parce qu'un Subset ne peut pas être créé deux fois à partir de la même instance", ok: false, why: "Ce serait possible ; le problème est qu'une instance porte une seule transformation, appliquée à tous ses sous-ensembles." },
+      ] },
+    { q: "Avec OneCycleLR(max_lr=3e-3, total_steps=15 × 352), à quel moment le taux est-il maximal, et quand appelle-t-on scheduler.step() ?", ref: '#s7',
+      o: [
+        { t: "Vers 30 % de l'entraînement (époque 5), et après chaque lot d'images", ok: true, why: "Le pic est au pas 1 583 sur 5 280, et scheduler.step() est dans la boucle des lots (common/train.py l. 32)." },
+        { t: "Au tout premier pas, puis il décroît, avec un appel par époque", ok: false, why: "Le taux de départ vaut un 25e du pic (1,2e-4) : il monte d'abord. Et l'appel se fait à chaque lot, pas à chaque époque." },
+        { t: "Vers 30 % de l'entraînement (époque 5), mais un seul appel par époque", ok: false, why: "Le pic est bien là, mais avec un appel par époque le planning n'avancerait que de 15 pas au lieu de 5 280." },
+        { t: "À mi-parcours de l'entraînement (époque 8), et après chaque lot", ok: false, why: "Le pic est à 30 % du trajet (pas 1 583), pas à 50 % : la phase de descente est plus longue que la montée." },
+      ] },
+    { q: "Précision de validation 78,19 %, de test 77,60 % (moyennes de 3 graines) : que conclure de l'écart de 0,59 point ?", trap: true, ref: '#s8',
+      o: [
+        { t: "Il reste du même ordre que l'incertitude de tirage des images (environ 0,6 point)", ok: true, why: "Avec n = 5 000 et n = 10 000, l'incertitude binomiale vaut environ ±0,58 et ±0,42 point : l'écart observé est plus petit que leur combinaison." },
+        { t: "Il prouve que les augmentations et le pooling global suppriment le surapprentissage", ok: false, why: "Aucune ablation (sans augmentation, sans pooling global) n'a été faite : la cause n'est pas testée, et l'écart n'est de toute façon pas lisible." },
+        { t: "Il est significatif, puisque les graines ne diffèrent que de 0,08 point sur le test", ok: false, why: "L'écart entre graines mesure l'aléa d'entraînement sur les mêmes images, pas l'incertitude liée au tirage des images du jeu." },
+        { t: "Il prouve que la validation est biaisée : elle surestime la précision du test", ok: false, why: "Le palier ne compare qu'une seule configuration, et un écart de 0,59 point peut venir du seul tirage des images." },
+      ] },
+  ];
+  // La bonne réponse est écrite en premier ci-dessus : on tourne les propositions (ordre fixe, reproductible) pour varier sa position.
+  QUIZ.forEach((x, qi) => { const k = (qi * 3 + 1) % x.o.length; x.o = x.o.slice(k).concat(x.o.slice(0, k)); });
+  const quizState = QUIZ.map(() => null);
+  const quizBox = $('#quizBox');
+  const MISSED_KEY = 's03_cnn_cifar_quiz_missed';
+  const loadMissed = () => { try { return JSON.parse(localStorage.getItem(MISSED_KEY) || '[]'); } catch (e) { return []; } };
+  const saveMissed = (m) => { try { localStorage.setItem(MISSED_KEY, JSON.stringify(m)); } catch (e) { /* stockage indisponible : le quiz marche quand même */ } };
+  const shuffle = (a) => { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
+  let order = QUIZ.map((_, i) => i);
+  const hintOf = (x) => (x.multi ? 'Coche toutes les bonnes réponses.' : 'Une seule bonne réponse.');
+  function renderQuiz() {
+    quizBox.innerHTML = '<div class="quiz-head"><span class="score" id="qscore"></span><span class="row"><button id="qreset">↺ Recommencer</button><button id="qshuf">⇄ Mélanger</button><button id="qmiss"></button><button id="qall">Toutes les questions</button></span></div>'
+      + order.map((qi, pos) => { const x = QUIZ[qi]; return `<div class="q" data-q="${qi}">
+        <p class="qt"><span class="tag ${x.trap ? 'trap' : ''}">${x.trap ? 'Piège' : 'Question ' + (pos + 1)}</span>${x.multi ? '<span class="tag multi">Plusieurs réponses</span>' : ''}${x.q}</p>
+        <p class="hint">${hintOf(x)}</p>
+        ${x.o.map((o, oi) => `<label class="opt" data-o="${oi}"><input type="${x.multi ? 'checkbox' : 'radio'}" name="q${qi}"><span class="ot">${o.t}<span class="why">${o.ok ? '✓ Vrai. ' : '✗ Faux. '}${o.why}</span></span></label>`).join('')}
+        <div class="row"><button class="check on">Valider</button></div>
+        <div class="explain"><p class="res"></p>${x.ref ? `<p class="muted">À relire : <a href="${x.ref}">${x.ref}</a></p>` : ''}</div>
+      </div>`; }).join('');
+    updateScore(); updateMissedBtn();
+  }
+  function updateMissedBtn() {
+    const n = QUIZ.filter((x) => loadMissed().includes(x.q)).length, b = $('#qmiss');
+    b.textContent = `Refaire les ratées (${n})`; b.disabled = n === 0;
+    $('#qall').hidden = order.length === QUIZ.length;
+  }
+  function updateScore() {
+    const done = order.filter((qi) => quizState[qi]), right = done.filter((qi) => quizState[qi].right).length;
+    $('#qscore').textContent = `Score : ${right} / ${order.length}` + (done.length < order.length ? ` (${done.length} répondue${done.length > 1 ? 's' : ''})` : ' : terminé');
+  }
+  quizBox.addEventListener('click', (e) => {
+    if (e.target.id === 'qreset') { quizState.fill(null); renderQuiz(); return; }
+    if (e.target.id === 'qshuf') { shuffle(order); order.forEach((qi) => shuffle(QUIZ[qi].o)); quizState.fill(null); renderQuiz(); return; }
+    if (e.target.id === 'qmiss') { const m = loadMissed(); order = QUIZ.map((_, i) => i).filter((i) => m.includes(QUIZ[i].q)); quizState.fill(null); renderQuiz(); return; }
+    if (e.target.id === 'qall') { order = QUIZ.map((_, i) => i); quizState.fill(null); renderQuiz(); return; }
+    const btn = e.target.closest('button.check'); if (!btn) return;
+    const box = btn.closest('.q'), qi = +box.dataset.q, x = QUIZ[qi];
+    if (quizState[qi]) return;
+    const picked = [...box.querySelectorAll('.opt')].map((l) => l.querySelector('input').checked);
+    if (!picked.some(Boolean)) { box.querySelector('.hint').textContent = 'Choisis au moins une réponse.'; return; }
+    box.querySelector('.hint').textContent = hintOf(x);
+    let nbOk = 0, nbBad = 0;
+    box.querySelectorAll('.opt').forEach((l, oi) => {
+      const ok = x.o[oi].ok, sel = picked[oi];
+      l.classList.add(ok && sel ? 'good' : !ok && sel ? 'wrong' : ok ? 'miss' : 'neutral');
+      if (ok && sel) nbOk++;
+      if (!ok && sel) nbBad++;
+      l.querySelector('input').disabled = true;
+    });
+    const total = x.o.filter((o) => o.ok).length, right = nbOk === total && nbBad === 0;
+    quizState[qi] = { right };
+    const res = box.querySelector('.res');
+    res.className = 'res ' + (right ? 'ok' : nbOk > 0 && nbBad === 0 ? 'part' : 'ko');
+    res.textContent = right ? 'Correct.' : nbOk > 0 && nbBad === 0 ? `Incomplet : tu as trouvé ${nbOk} bonne(s) réponse(s) sur ${total}.` : 'Pas tout à fait.';
+    box.classList.add('done'); btn.disabled = true;
+    saveMissed(loadMissed().filter((t) => t !== x.q).concat(right ? [] : [x.q]));
+    updateScore(); updateMissedBtn();
+  });
+  renderQuiz();
+
+  /* ---------- Prédire avant de voir ---------- */
+  const PRED = [
+    { id: 'p1', target: '#s1 .main', q: "Une image de 30×30 pixels (pas divisible par 8) entre dans le réseau. Que se passe-t-il ?",
+      o: ["Erreur : 30 n'est pas divisible par 2 trois fois de suite", "Pas d'erreur ; le bloc 3 sort en 3×3 car le pooling arrondit vers le bas", "Pas d'erreur ; le bloc 3 sort en 4×4 car le pooling arrondit vers le haut", "Pas d'erreur, mais seulement après un recadrage automatique à 32×32"], ok: 1,
+      reveal: () => { const s = D.shapeRuns['30'].shapes, e = D.shapeRuns['7']; return `PyTorch (exécution réelle) : ${s.slice(0, 4).map((x) => `(${x[1].slice(2).join('×')})`).join(' → ')} puis sortie ${'(' + s[4][1].join(', ') + ')'}. Pas d'erreur. L'erreur ne vient qu'en dessous de 8 pixels (pour 7 : « ${e.error} »). Vérifie avec le curseur.`; } },
+    { id: 'p2', target: '#s3 .main', q: "On double le nombre de canaux de chaque bloc (64, 128, 256 au lieu de 32, 64, 128). Par combien le nombre total de paramètres est-il multiplié ?",
+      o: ["Environ 2, puisque les canaux doublent", "Environ 3,9, puisque c_in et c_out doublent", "Environ 8, puisque les trois blocs doublent", "Environ 1,5, puisque seule la tête change vraiment"], ok: 1,
+      reveal: () => { const g = D.paramsGrid[1].total, b = D.paramsGrid[0].total; return `PyTorch : ${fmtI(g)} paramètres contre ${fmtI(b)}, soit ×${fr(g / b, 2)}. Le poids d'une convolution est un produit c_in × c_out : si les deux doublent, il est multiplié par 4 ; seul le premier bloc (c_in = 3 fixe) fait un peu moins.`; } },
+    { id: 'p3', target: '#s4 .main', q: "En mode train, on ajoute +5 à toutes les valeurs d'un canal juste avant la BatchNorm. Que devient la sortie de la BatchNorm ?",
+      o: ["Décalée de +5 comme l'entrée", "Identique, à l'arrondi flottant près", "Décalée de 5 divisé par l'écart-type du lot", "Identique seulement si γ vaut 1 et β vaut 0"], ok: 1,
+      reveal: () => `PyTorch (script d'export, BatchNorm en mode train sur les 10 images) : l'écart maximal entre la sortie avec et sans le +5 vaut ${sci(D.bn.shiftMaxDiff)}, c'est-à-dire l'arrondi des flottants. La moyenne du lot absorbe le décalage, quels que soient γ et β : c'est pourquoi un biais de convolution est inutile.` },
+    { id: 'p4', target: '#s8 .main', q: "Un modèle a une vraie précision de 78 %. On la mesure sur 5 000 images tirées au hasard. De combien la précision mesurée varie-t-elle typiquement d'un tirage à l'autre ?",
+      o: ["D'environ 0,06 point", "D'environ 0,6 point", "D'environ 3 points", "D'environ 6 points"], ok: 1,
+      reveal: () => `√(0,78 × 0,22 / 5 000) = ${fr(100 * Math.sqrt(0.78 * 0.22 / 5000), 2)} point (approximation binomiale, calcul de la page). Comparé à l'écart val/test de 0,59 point du rapport : du même ordre. Regarde l'axe ci-dessous.` },
+  ];
+  PRED.forEach((p) => {
+    const target = $(p.target); if (!target) return;
+    const box = document.createElement('div'); box.className = 'predict'; box.id = p.id;
+    box.innerHTML = `<h4>Prédis d'abord</h4><p>${p.q}</p>` + p.o.map((t, i) => `<label class="opt" data-o="${i}"><input type="radio" name="${p.id}"><span class="ot">${t}</span></label>`).join('')
+      + '<div class="row"><button class="on pv">Valider ma prédiction</button><button class="skip">Passer, je veux juste explorer</button></div><p class="muted pmsg"></p><div class="tip pres" hidden></div>';
+    target.before(box);
+    target.classList.add('locked'); target.setAttribute('inert', '');
+    const unlock = () => { target.classList.remove('locked'); target.removeAttribute('inert'); box.querySelectorAll('input,button').forEach((b) => { b.disabled = true; }); };
+    box.querySelector('.skip').addEventListener('click', unlock);
+    box.querySelector('.pv').addEventListener('click', () => {
+      const idx = [...box.querySelectorAll('input')].findIndex((i) => i.checked);
+      if (idx < 0) { box.querySelector('.pmsg').textContent = 'Choisis une réponse, ou passe.'; return; }
+      box.querySelectorAll('.opt').forEach((l, i) => l.classList.add(i === p.ok ? (i === idx ? 'good' : 'miss') : i === idx ? 'wrong' : 'neutral'));
+      const pres = box.querySelector('.pres'); pres.hidden = false;
+      pres.innerHTML = `<b>${idx === p.ok ? 'Bien vu.' : 'Pas tout à fait : tu avais prédit autre chose.'}</b> ${HAS ? p.reveal() : 'Données absentes : relance l\'export.'}`;
+      box.querySelector('.pmsg').textContent = '';
+      unlock();
+    });
+  });
+
+  /* ---------- Explique avec tes mots ---------- */
+  const PORTE = [
+    { q: "D'où viennent les 94 762 paramètres du réseau, et pourquoi la prédiction de 60 000 était-elle trop basse ?",
+      pts: ["Un Conv2d a c_out × c_in × k × k poids sans biais : 864, 18 432 et 73 728 pour les trois blocs, soit 93 024.", "BatchNorm ajoute 2 paramètres par canal (γ et β) : 448 ; la tête Linear(128, 10) en ajoute 1 290 ; total 94 762.", "Le nombre de poids croît avec le produit c_in × c_out : la dernière convolution pèse 77,8 % des 94 762 paramètres ; doubler tous les canaux multiplie le total par près de 4.", "parameters() ne compte pas les statistiques de BatchNorm (running_mean, running_var), qui sont pourtant dans state_dict() : 95 213 éléments."] },
+    { q: "Suis la forme d'un tenseur de (B, 3, 32, 32) jusqu'aux 10 logits. Qu'est-ce qui change, et qu'est-ce qui ne change pas, à chaque étape ?",
+      pts: ["Conv2d (noyau 3, padding 1) change le nombre de canaux mais pas H ni W ; BatchNorm et ReLU ne changent aucune forme.", "MaxPool2d(2) divise H et W par 2 (arrondi vers le bas) : (32, 16, 16), puis (64, 8, 8), puis (128, 4, 4) après les blocs 1, 2 et 3.", "AdaptiveAvgPool2d((1, 1)) moyenne chaque carte : (B, 128, 1, 1) ; Flatten donne (B, 128) ; Linear donne (B, 10).", "La tête ne dépend pas de la taille spatiale : une image de 30×30 passe, une image de moins de 8 pixels est refusée par un MaxPool2d."] },
+    { q: "Que valent 78,19 % (validation) et 77,60 % (test), qu'en conclus-tu, et que ne peux-tu pas conclure ?",
+      pts: ["Ce sont des moyennes de 3 graines (0, 1, 2), sur 5 000 images de validation et 10 000 images de test ; le test n'est lu qu'une fois par run, avec --test.", "L'écart entre graines (±0,32 en val, ±0,08 en test) ne mesure que l'aléa d'entraînement sur les mêmes images.", "L'incertitude de tirage des images (√(p(1−p)/n), environ ±0,6 et ±0,4 point) est plus grande : l'écart val/test de 0,59 point n'est pas interprétable.", "Le palier ne prouve pas que les augmentations ou le pooling global évitent le surapprentissage (aucune ablation), ni que 78 % est un bon score (aucune comparaison)."] },
+  ];
+  const PORTE_KEY = 's03_cnn_cifar_porte';
+  const loadPorte = () => { try { return JSON.parse(localStorage.getItem(PORTE_KEY) || '{}'); } catch (e) { return {}; } };
+  const savePorte = (v) => { try { localStorage.setItem(PORTE_KEY, JSON.stringify(v)); } catch (e) { /* stockage indisponible */ } };
+  (() => {
+    const saved = loadPorte();
+    $('#porteBox').innerHTML = PORTE.map((x, i) => `<div class="porte-q" data-i="${i}"><p><b>${i + 1}.</b> ${x.q}</p>
+      <textarea aria-label="Ta réponse à la question ${i + 1}" placeholder="Écris ta réponse avec tes mots, sans regarder la page."></textarea>
+      <div class="row"><button class="on reveal">Voir les points attendus</button></div>
+      <div class="pts" hidden>${x.pts.map((t, k) => `<label><input type="checkbox" data-k="${k}"><span>${t}</span></label>`).join('')}<p class="muted sc"></p></div></div>`).join('');
+    $$('.porte-q').forEach((box) => {
+      const i = +box.dataset.i, ta = box.querySelector('textarea'), s = saved[i] || {};
+      ta.value = s.text || '';
+      const score = () => { const n = box.querySelectorAll('.pts input:checked').length; box.querySelector('.sc').textContent = `Points que tu avais : ${n} / ${PORTE[i].pts.length}. Ceux que tu n'as pas cochés sont à relire dans le résumé ou dans les sections correspondantes.`; };
+      const persist = () => { const all = loadPorte(); all[i] = { text: ta.value, got: [...box.querySelectorAll('.pts input')].map((c) => c.checked) }; savePorte(all); };
+      ta.addEventListener('input', persist);
+      box.querySelector('.reveal').addEventListener('click', () => { box.querySelector('.pts').hidden = false; box.querySelector('.reveal').disabled = true; score(); });
+      box.querySelectorAll('.pts input').forEach((c, k) => { c.checked = !!(s.got && s.got[k]); c.addEventListener('change', () => { score(); persist(); }); });
+    });
+  })();
+
+  /* ---------- Extraits de code : lus dans donnees/s03.js ---------- */
+  (() => {
+    const srcs = HAS && D.sources, first = srcs && Object.keys(srcs)[0];
+    $$('.codeblock[data-code]').forEach((d) => {
+      if (!srcs) { d.hidden = true; return; }
+      const groups = d.dataset.code.split(';').map((gp) => { const at = gp.indexOf('@'); return { file: at < 0 ? first : gp.slice(0, at), ranges: (at < 0 ? gp : gp.slice(at + 1)).split(',').map((r) => r.split('-').map(Number)) }; });
+      let html = '';
+      groups.forEach((gp, k) => {
+        const lines = srcs[gp.file] || [];
+        if (groups.length > 1 || k) html += `<span class="fh">${esc(gp.file)}</span>\n`;
+        gp.ranges.forEach(([a, b], i) => {
+          if (i) html += '<span class="gap">⋮</span>\n';
+          for (let n = a; n <= (b || a); n++) html += `<span class="ln">${n}</span>${esc(lines[n - 1])}\n`;
+        });
+      });
+      d.querySelector('pre').innerHTML = html.replace(/\n$/, '');
+      d.querySelector('.cf').textContent = groups.map((gp) => `${gp.file}, l.${gp.ranges.map((r) => r.join('-')).join(' et ')}`).join(' ; ');
+    });
+  })();
+})();
+</script>
+</body>
+</html>

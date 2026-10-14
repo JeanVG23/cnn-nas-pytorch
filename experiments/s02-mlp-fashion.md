@@ -32,9 +32,3 @@ Quelle précision de validation un perceptron multicouche à deux couches caché
 * Paramètres : l'estimation de Jean (~250k) est très proche de la réalité (235 146).
 * Précision : la prédiction initiale de 10 % correspondait en réalité au niveau du pur hasard (1 chance sur 10 sans apprentissage). En pratique, le MLP dépasse 86 % dès la première époque et atteint 89.61 % en 10 époques. Même sans convolution, les corrélations de pixels bruts suffisent à discriminer une grande partie des vêtements.
 * Exécution : le lancement initial via `python steps/s02_mlp_fashion.py` a échoué sur `ModuleNotFoundError: No module named 'common'`. Résolu en exécutant via le module `python -m steps.s02_mlp_fashion` pour garantir que la racine du projet est présente dans `sys.path`.
-
-## 6. Questions à savoir traiter sans le dépôt
-
-1. Que fait `DataLoader(shuffle=True)` à chaque époque, et pourquoi le loader de validation ne mélange-t-il pas ?
-2. Suis la forme du tenseur depuis `(B, 1, 28, 28)` jusqu'à `(B, 10)`, et explique pourquoi `CrossEntropyLoss` reçoit des logits et non des probabilités après un softmax.
-3. À quoi servent `model.train()` et `model.eval()` ? Pour ce MLP la différence est nulle : pourquoi appeler quand même les deux ?

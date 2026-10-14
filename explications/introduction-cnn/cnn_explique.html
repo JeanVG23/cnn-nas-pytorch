@@ -1,0 +1,736 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Comprendre les CNN</title>
+<style>
+:root {
+  --bg: #f7f7f4;
+  --surface: #ffffff;
+  --surface2: #efefe9;
+  --text: #1d1f23;
+  --muted: #5d6470;
+  --line: #d9d9d0;
+  --accent: #d9480f;
+  --pos: #ff922b;
+  --neg: #4dabf7;
+  --on-strong: #14161a;
+  --hl: #7048e8;
+  --ok: #2b8a3e;
+  --bad: #c92a2a;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #14161a;
+    --surface: #1d2026;
+    --surface2: #262a32;
+    --text: #eceae4;
+    --muted: #a0a6b0;
+    --line: #353a44;
+    --accent: #ff922b;
+    --hl: #9775fa;
+    --ok: #69db7c;
+    --bad: #ff8787;
+  }
+}
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; scroll-padding-top: 64px; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font: 16px/1.6 system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+.wrap { max-width: 980px; margin: 0 auto; padding: 0 16px; }
+
+/* En-tête et navigation */
+header.hero { padding: 40px 0 16px; }
+header.hero h1 { font-size: clamp(1.7rem, 5vw, 2.5rem); line-height: 1.2; margin: 0 0 12px; }
+.lead { font-size: 1.1rem; color: var(--muted); max-width: 68ch; margin: 0; }
+nav.top {
+  position: sticky; top: 0; z-index: 10;
+  background: color-mix(in srgb, var(--bg) 92%, transparent);
+  backdrop-filter: blur(6px);
+  border-bottom: 1px solid var(--line);
+}
+nav.top .wrap { display: flex; gap: 4px 14px; flex-wrap: wrap; padding-top: 10px; padding-bottom: 10px; }
+nav.top a { color: var(--muted); text-decoration: none; font-size: .9rem; font-weight: 600; }
+nav.top a:hover { color: var(--accent); }
+
+/* Sections */
+section { padding: 36px 0 8px; }
+section h2 { font-size: 1.5rem; margin: 0 0 8px; }
+section h2 .n {
+  display: inline-grid; place-items: center; width: 1.7em; height: 1.7em;
+  border-radius: 50%; background: var(--accent); color: #fff; font-size: .8em; margin-right: 8px;
+}
+p { margin: 0 0 12px; max-width: 74ch; }
+.muted { color: var(--muted); }
+.card {
+  background: var(--surface); border: 1px solid var(--line);
+  border-radius: 12px; padding: 16px; margin: 14px 0;
+}
+.card h3, .card h4 { margin: 0 0 6px; }
+.card h3 { font-size: 1.05rem; }
+code, .mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .92em; }
+.tip {
+  border-left: 4px solid var(--hl); background: var(--surface2);
+  padding: 10px 14px; border-radius: 0 8px 8px 0; margin: 14px 0; max-width: 74ch;
+}
+
+/* Boutons */
+.row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 10px 0; }
+button {
+  font: inherit; font-size: .9rem; cursor: pointer;
+  background: var(--surface); color: var(--text);
+  border: 1px solid var(--line); border-radius: 8px; padding: 6px 12px;
+}
+button:hover { border-color: var(--accent); }
+button.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+@media (prefers-color-scheme: dark) { button.on { color: #14161a; } }
+label.chk { font-size: .9rem; display: inline-flex; gap: 6px; align-items: center; cursor: pointer; }
+
+/* Grilles de cases */
+.grid { display: grid; gap: 2px; width: max-content; user-select: none; -webkit-user-select: none; touch-action: none; }
+.grid.nopaint { touch-action: auto; }
+.cell {
+  width: var(--cs, 40px); height: var(--cs, 40px);
+  display: flex; align-items: center; justify-content: center;
+  font: 600 12px/1 ui-monospace, Menlo, monospace;
+  border: 1px solid var(--line); border-radius: 4px;
+}
+.cell.win, .cell.sel { outline: 3px solid var(--hl); outline-offset: -2px; position: relative; z-index: 1; }
+.paint .cell { cursor: crosshair; }
+.hover .cell { cursor: pointer; }
+.blocks { display: flex; flex-wrap: wrap; gap: 20px 28px; align-items: flex-start; margin: 12px 0; }
+.block h4 { margin: 0 0 6px; font-size: .95rem; }
+.block .cap { font-size: .85rem; color: var(--muted); margin: 6px 0 0; max-width: 30ch; }
+.op { align-self: center; font-size: 1.6rem; color: var(--muted); }
+
+/* Noyau modifiable */
+.kgrid { display: grid; grid-template-columns: repeat(3, 58px); gap: 4px; }
+.kgrid input {
+  width: 58px; padding: 8px 4px; text-align: center;
+  font: 600 14px ui-monospace, Menlo, monospace;
+  background: var(--surface); color: var(--text);
+  border: 1px solid var(--line); border-radius: 6px;
+}
+.kgrid input:focus { outline: 2px solid var(--hl); }
+
+.calc {
+  background: var(--surface2); border-radius: 10px; padding: 12px 14px; margin-top: 10px;
+}
+.calc .blocks { margin: 6px 0; align-items: center; }
+.calc .mini h5 { margin: 0 0 4px; font-size: .8rem; color: var(--muted); font-weight: 600; }
+.sumline { font-weight: 700; }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 18px; font-size: .88rem; color: var(--muted); margin: 8px 0; }
+.legend i { display: inline-block; width: 14px; height: 14px; border-radius: 3px; vertical-align: -2px; margin-right: 5px; border: 1px solid var(--line); }
+.sw-pos { background: var(--pos); } .sw-neg { background: var(--neg); } .sw-zero { background: var(--surface); }
+
+.two { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 14px; }
+.two .card { margin: 0; }
+
+/* Pipeline */
+.pipe { display: flex; gap: 8px; align-items: stretch; flex-wrap: nowrap; overflow-x: auto; padding-bottom: 6px; }
+.stage {
+  flex: 0 0 auto; background: var(--surface); border: 1px solid var(--line);
+  border-radius: 12px; padding: 12px; position: relative;
+}
+.stage h4 { margin: 4px 0 8px; font-size: .95rem; }
+.stage .cap { font-size: .82rem; color: var(--muted); margin: 8px 0 0; max-width: 26ch; }
+.arrow { align-self: center; font-size: 1.5rem; color: var(--muted); flex: 0 0 auto; }
+.badge {
+  display: inline-block; font-size: .7rem; font-weight: 700; letter-spacing: .03em; text-transform: uppercase;
+  padding: 2px 8px; border-radius: 99px; background: var(--surface2); color: var(--muted);
+}
+.badge.hid { background: var(--hl); color: #fff; }
+.fm { margin-bottom: 10px; }
+.fmhead { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; font-size: .85rem; font-weight: 700; }
+.final { margin-top: 12px; }
+.strips { display: grid; gap: 6px; margin: 6px 0 10px; }
+.strips .lab { font-size: .8rem; color: var(--muted); margin-bottom: 2px; }
+.out { margin-top: 8px; }
+.bar-row { display: grid; grid-template-columns: 130px 1fr 52px; gap: 10px; align-items: center; margin: 6px 0; font-size: .92rem; }
+.bar { height: 18px; background: var(--surface2); border-radius: 9px; overflow: hidden; border: 1px solid var(--line); }
+.bar span { display: block; height: 100%; background: var(--accent); transition: width .2s; }
+.verdict { font-size: 1.05rem; font-weight: 700; margin-top: 8px; }
+.formula { font: 13px/1.7 ui-monospace, Menlo, monospace; background: var(--surface2); border-radius: 8px; padding: 8px 12px; margin: 6px 0; overflow-x: auto; }
+
+/* Cartes d'idées */
+.levels { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 10px; margin: 12px 0; }
+.level { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 12px; }
+.level b { display: block; color: var(--accent); font-size: .8rem; text-transform: uppercase; letter-spacing: .04em; }
+.chain { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin: 10px 0; font-size: .88rem; }
+.chain span.chip { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 4px 10px; }
+.chain span.chip.h { border-color: var(--hl); }
+.chain span.sep { color: var(--muted); }
+
+/* Quiz */
+.q { margin: 12px 0; }
+.q .opts { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+.q button.good { background: var(--ok); border-color: var(--ok); color: #fff; }
+.q button.bad { background: var(--bad); border-color: var(--bad); color: #fff; }
+.q .fb { margin-top: 6px; font-size: .9rem; min-height: 1.4em; }
+
+footer { padding: 36px 0 60px; color: var(--muted); font-size: .85rem; }
+
+@media (max-width: 700px) {
+  .bar-row { grid-template-columns: 100px 1fr 46px; }
+  .pipe { flex-direction: column; overflow-x: visible; }
+  .arrow { transform: rotate(90deg); }
+  .stage .cap { max-width: none; }
+}
+</style>
+</head>
+<body>
+
+<header class="hero">
+  <div class="wrap">
+    <h1>Comment fonctionne un réseau de neurones convolutif (CNN) ?</h1>
+    <p class="lead">Un CNN est un réseau de neurones conçu pour lire des images. Ici, tout se manipule : dessine, change les filtres, regarde les nombres bouger. Cinq étapes, du pixel jusqu'à la décision.</p>
+  </div>
+</header>
+
+<nav class="top">
+  <div class="wrap">
+    <a href="#image">1. L'image</a>
+    <a href="#filtre">2. Le filtre</a>
+    <a href="#relu-pool">3. ReLU et pooling</a>
+    <a href="#assembler">4. Tout assembler</a>
+    <a href="#vrai">5. Un vrai CNN</a>
+    <a href="#quiz">Quiz</a>
+  </div>
+</nav>
+
+<main class="wrap">
+
+<!-- 1 --------------------------------------------------------------- -->
+<section id="image">
+  <h2><span class="n">1</span>Une image, c'est une grille de nombres</h2>
+  <p>Pour un ordinateur, une image en noir et blanc est un tableau de nombres : <b>0</b> pour un pixel noir, <b>1</b> pour un pixel blanc (en vrai, de 0 à 255, mais restons simples). Une photo en couleur, c'est la même chose avec trois grilles empilées : rouge, vert, bleu.</p>
+  <p><b>À toi :</b> clique ou glisse sur la grille pour dessiner. Cette image de 8×8 pixels servira aux étapes 2 et 3.</p>
+  <div class="card">
+    <div class="row" id="presets1"></div>
+    <div class="row"><label class="chk"><input type="checkbox" id="showNums" checked> Afficher les nombres</label></div>
+    <div class="grid paint" id="gImg"></div>
+  </div>
+</section>
+
+<!-- 2 --------------------------------------------------------------- -->
+<section id="filtre">
+  <h2><span class="n">2</span>Le filtre : un détecteur de motif</h2>
+  <p>Un <b>filtre</b> (ou noyau) est une minuscule grille de nombres, ici 3×3. On le pose sur un coin de l'image, on <b>multiplie</b> chaque pixel par le nombre du filtre placé en face, puis on <b>additionne</b> le tout : cela donne <b>un seul nombre</b>. On glisse ensuite le filtre d'une case et on recommence. L'ensemble des résultats s'appelle une <b>carte de caractéristiques</b> (feature map).</p>
+  <p><b>À toi :</b> passe la souris (ou touche) une case de la sortie pour voir le calcul, ou lance l'animation. Change de filtre, ou écris tes propres valeurs.</p>
+
+  <div class="card">
+    <div class="row" id="presetsK"></div>
+    <p class="muted" id="kdesc" style="min-height:3em"></p>
+    <div class="blocks">
+      <div class="block">
+        <h4>Image (entrée)</h4>
+        <div class="grid" id="gIn2"></div>
+        <p class="cap">Le carré violet est la fenêtre en cours de lecture.</p>
+      </div>
+      <div class="block">
+        <h4>Filtre 3×3</h4>
+        <div class="kgrid" id="gK"></div>
+        <div class="row"><button id="btnAnim">▶ Animer le balayage</button></div>
+      </div>
+      <div class="block">
+        <h4>Carte de sortie (6×6)</h4>
+        <div class="grid hover" id="gOut2"></div>
+        <div class="legend">
+          <span><i class="sw-pos"></i>motif trouvé</span>
+          <span><i class="sw-neg"></i>motif inverse</span>
+          <span><i class="sw-zero"></i>rien</span>
+        </div>
+      </div>
+    </div>
+    <div class="calc" id="calc"></div>
+  </div>
+
+  <div class="tip">
+    <b>Pourquoi 6×6 et pas 8×8 ?</b> Un filtre 3×3 ne peut se poser que sur 6×6 positions dans une image 8×8. Pour garder la taille, on peut ajouter une bordure de zéros (le <i>padding</i>). On peut aussi glisser de plus d'une case à la fois (le <i>stride</i>) ; ici, il vaut 1.
+  </div>
+</section>
+
+<!-- 3 --------------------------------------------------------------- -->
+<section id="relu-pool">
+  <h2><span class="n">3</span>ReLU puis pooling : garder l'essentiel</h2>
+  <div class="two">
+    <div class="card">
+      <h3>ReLU : on efface les négatifs</h3>
+      <p>Chaque nombre négatif devient 0, les positifs ne bougent pas. Un score négatif signifie « le motif cherché est absent » : on ne garde que les détections. ReLU rend aussi le réseau capable d'apprendre autre chose que des formules linéaires ; sans elle, empiler des couches reviendrait à n'en avoir qu'une.</p>
+    </div>
+    <div class="card">
+      <h3>Pooling : on réduit</h3>
+      <p>On découpe la carte en blocs 2×2 et on ne garde que le <b>plus grand</b> nombre de chaque bloc (<i>max pooling</i>). La carte est 4 fois plus petite, et peu importe que le motif soit décalé d'un pixel : l'information « il y a un bord par ici » reste.</p>
+    </div>
+  </div>
+  <p style="margin-top:14px"><b>À toi :</b> passe la souris sur une case de la carte réduite pour voir quel bloc 2×2 elle résume. Le filtre utilisé est celui choisi à l'étape 2 : <b id="kname3"></b>.</p>
+  <div class="card">
+    <div class="blocks">
+      <div class="block"><h4>Sortie du filtre</h4><div class="grid nopaint" id="gRaw"></div></div>
+      <div class="op">→</div>
+      <div class="block"><h4>Après ReLU</h4><div class="grid nopaint" id="gAct"></div></div>
+      <div class="op">→</div>
+      <div class="block"><h4>Après max pooling (3×3)</h4><div class="grid hover" id="gPool"></div></div>
+    </div>
+    <div class="formula" id="poolcalc"></div>
+  </div>
+</section>
+
+<!-- 4 --------------------------------------------------------------- -->
+<section id="assembler">
+  <h2><span class="n">4</span>Tout assembler : couches cachées et décision</h2>
+  <p>Un CNN enchaîne ces briques. Ci-dessous, un mini-réseau complet qui répond à une seule question : <b>ton dessin contient-il un trait vertical ou un trait horizontal ?</b> Il utilise deux filtres (un par motif), puis ReLU, puis pooling, puis une décision.</p>
+  <p><b>À toi :</b> dessine, ou choisis une forme, et suis les nombres de gauche à droite. Essaie la croix, la diagonale, un seul point : le réseau hésite, et c'est instructif.</p>
+
+  <div class="card">
+    <div class="row" id="presets4"></div>
+    <div class="pipe">
+      <div class="stage">
+        <span class="badge">Entrée</span>
+        <h4>Ton dessin</h4>
+        <div class="grid paint" id="gDraw"></div>
+        <p class="cap">8×8 pixels, 64 nombres.</p>
+      </div>
+      <div class="arrow">→</div>
+      <div class="stage">
+        <span class="badge hid">Couche cachée 1</span>
+        <h4>Convolution (2 filtres)</h4>
+        <div class="fm"><div class="fmhead"><div class="grid nopaint" id="kV"></div>filtre « vertical »</div><div class="grid nopaint" id="mV"></div></div>
+        <div class="fm"><div class="fmhead"><div class="grid nopaint" id="kH"></div>filtre « horizontal »</div><div class="grid nopaint" id="mH"></div></div>
+        <p class="cap">Chaque filtre produit sa propre carte 6×6.</p>
+      </div>
+      <div class="arrow">→</div>
+      <div class="stage">
+        <span class="badge hid">Couche cachée 2</span>
+        <h4>ReLU + pooling</h4>
+        <div class="fm"><div class="fmhead">carte « vertical »</div><div class="grid nopaint" id="pV"></div></div>
+        <div class="fm"><div class="fmhead">carte « horizontal »</div><div class="grid nopaint" id="pH"></div></div>
+        <p class="cap">Négatifs à 0, puis le max de chaque bloc 2×2 : cartes 3×3.</p>
+      </div>
+    </div>
+
+    <div class="final">
+      <span class="badge">Aplatir, puis couche de sortie</span>
+      <p style="margin-top:8px">On <b>aplatit</b> les cartes en une simple liste de 18 nombres. Le neurone de sortie « vertical » additionne les valeurs de la carte V (poids +1) et soustrait celles de la carte H (poids -1) ; le neurone « horizontal » fait l'inverse. Ces poids sont choisis à la main pour la démo.</p>
+      <div class="strips">
+        <div><div class="lab">carte « vertical » aplatie (9 valeurs)</div><div class="grid nopaint" id="fV"></div></div>
+        <div><div class="lab">carte « horizontal » aplatie (9 valeurs)</div><div class="grid nopaint" id="fH"></div></div>
+      </div>
+      <div class="formula" id="dense"></div>
+      <div class="out">
+        <p class="muted" style="margin-bottom:4px">La fonction <b>softmax</b> transforme les deux scores en probabilités dont la somme vaut 100 %.</p>
+        <div class="bar-row"><span>Trait vertical</span><div class="bar"><span id="barV"></span></div><b id="pctV"></b></div>
+        <div class="bar-row"><span>Trait horizontal</span><div class="bar"><span id="barH"></span></div><b id="pctH"></b></div>
+        <div class="verdict" id="verdict"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>Pourquoi « cachées » ?</h3>
+    <p>L'entrée (l'image) et la sortie (la réponse) sont visibles de l'extérieur. Toutes les couches intermédiaires, ici la convolution et le pooling, sont <b>cachées</b> : personne ne leur dit ce qu'elles doivent produire. Ce sont des représentations internes que le réseau construit pour arriver à la bonne réponse.</p>
+    <p style="margin-bottom:0">Notre mini-réseau ne reconnaît que ces deux motifs : face à une diagonale, il ne voit rien et hésite. Un vrai réseau a des dizaines de filtres et plusieurs couches, ce qui lui permet de reconnaître des choses bien plus riches.</p>
+  </div>
+</section>
+
+<!-- 5 --------------------------------------------------------------- -->
+<section id="vrai">
+  <h2><span class="n">5</span>Dans un vrai CNN</h2>
+  <p>On répète le bloc « convolution, ReLU, pooling » plusieurs fois, avec beaucoup de filtres par couche, puis on termine par des couches « denses » qui décident.</p>
+  <div class="chain">
+    <span class="chip">Image</span><span class="sep">→</span>
+    <span class="chip h">Conv 32 filtres + ReLU + Pool</span><span class="sep">→</span>
+    <span class="chip h">Conv 64 filtres + ReLU + Pool</span><span class="sep">→</span>
+    <span class="chip h">Aplatir</span><span class="sep">→</span>
+    <span class="chip h">Dense cachée (128 neurones)</span><span class="sep">→</span>
+    <span class="chip">Sortie + softmax (10 classes)</span>
+  </div>
+
+  <h3 style="margin-top:22px">Ce que chaque niveau apprend à voir</h3>
+  <div class="levels">
+    <div class="level"><b>Couche 1</b>Des traits simples : bords, taches de couleur, lignes à différents angles. Ce sont les filtres de l'étape 2.</div>
+    <div class="level"><b>Couche 2</b>Des combinaisons de traits : coins, courbes, textures (rayures, grain).</div>
+    <div class="level"><b>Couche 3</b>Des parties d'objets : un œil, une roue, une fenêtre.</div>
+    <div class="level"><b>Couches finales</b>L'objet entier : « chat », « voiture », « chiffre 7 ».</div>
+  </div>
+
+  <div class="two">
+    <div class="card">
+      <h3>Pourquoi c'est malin</h3>
+      <p><b>Connexions locales :</b> chaque nombre de sortie ne regarde qu'un petit voisinage (3×3), pas l'image entière.</p>
+      <p style="margin-bottom:0"><b>Poids partagés :</b> le même filtre (9 nombres) est réutilisé partout. Un motif détecté en haut à gauche l'est aussi en bas à droite, et le réseau reste léger : sur une image 224×224, un réseau tout connecté aurait des millions de poids rien que pour sa première couche.</p>
+    </div>
+    <div class="card">
+      <h3>Qui choisit les valeurs des filtres ?</h3>
+      <p>Pas un humain. Ici, je les ai écrites à la main, mais dans un vrai CNN elles sont <b>apprises</b> : on part de valeurs au hasard, on montre une image dont on connaît la réponse, le réseau se trompe, on mesure l'erreur, puis on corrige un peu chaque nombre dans le sens qui réduit l'erreur (descente de gradient, calculée par rétropropagation).</p>
+      <p style="margin-bottom:0">Après des milliers d'images, les filtres de la première couche ressemblent d'eux-mêmes à des détecteurs de bords.</p>
+    </div>
+  </div>
+</section>
+
+<!-- Quiz ------------------------------------------------------------ -->
+<section id="quiz">
+  <h2>Pour vérifier</h2>
+  <div class="card" id="quizBox"></div>
+</section>
+
+</main>
+
+<footer>
+  <div class="wrap">Page pédagogique autonome : aucun réseau, aucune dépendance. Les filtres de l'étape 4 sont écrits à la main ; un vrai CNN les apprend.</div>
+</footer>
+
+<script>
+(() => {
+  const N = 8;          // taille de l'image
+  const M = N - 2;      // taille de la sortie d'un filtre 3x3
+  const $ = (s) => document.querySelector(s);
+  const range = (n) => [...Array(n).keys()];
+  const fmt = (x) => { const v = Math.round(x * 10) / 10; return String(v === 0 ? 0 : v); };
+  const CS8 = 'clamp(26px, 9vw, 42px)';
+  const CS6 = 'clamp(30px, 9vw, 44px)';
+
+  /* ---------- Données ---------- */
+  const SHAPES = [
+    { label: 'Trait vertical',   fn: (r, c) => c === 3 },
+    { label: 'Trait horizontal', fn: (r, c) => r === 3 },
+    { label: 'Diagonale',        fn: (r, c) => r === c },
+    { label: 'Croix',            fn: (r, c) => r === 3 || c === 3 },
+    { label: 'Carré',            fn: (r, c) => r >= 2 && r <= 5 && c >= 2 && c <= 5 },
+    { label: 'Lettre L',         fn: (r, c) => (c === 2 && r >= 1 && r <= 6) || (r === 6 && c >= 2 && c <= 5) },
+    { label: 'Un point',         fn: (r, c) => r === 3 && c === 3 },
+    { label: 'Effacer',          fn: () => false },
+  ];
+  const shape = (label) => range(N * N).map((i) => (SHAPES.find((s) => s.label === label).fn(Math.floor(i / N), i % N) ? 1 : 0));
+
+  const KERNELS = {
+    vertical:   { label: 'Contours verticaux',   k: [-1, 0, 1, -1, 0, 1, -1, 0, 1],
+                  desc: 'Compare la colonne de droite à celle de gauche : s\'allume là où l\'image passe du sombre au clair de gauche à droite (orange), et en bleu là où elle passe du clair au sombre.' },
+    horizontal: { label: 'Contours horizontaux', k: [-1, -1, -1, 0, 0, 0, 1, 1, 1],
+                  desc: 'Même idée à la verticale : compare la ligne du bas à celle du haut. Il repère les bords horizontaux.' },
+    ligneV:     { label: 'Trait vertical fin',   k: [-1, 2, -1, -1, 2, -1, -1, 2, -1],
+                  desc: 'Récompense la colonne du milieu et pénalise les colonnes voisines : il ne s\'allume vraiment que sur un trait vertical d\'un pixel de large.' },
+    flou:       { label: 'Flou',                 k: Array(9).fill(1 / 9),
+                  desc: 'Chaque case de sortie est la moyenne de ses 9 voisines (9 fois 0,11). Les détails s\'estompent.' },
+    nette:      { label: 'Netteté',              k: [0, -1, 0, -1, 5, -1, 0, -1, 0],
+                  desc: 'Renforce le pixel central et retire ses voisins : les contours ressortent.' },
+    id:         { label: 'Identité',             k: [0, 0, 0, 0, 1, 0, 0, 0, 0],
+                  desc: 'Ne garde que le pixel du centre : la sortie est l\'image elle-même, sans ses bords.' },
+  };
+
+  const FV = KERNELS.ligneV.k;
+  const FH = [-1, -1, -1, 2, 2, 2, -1, -1, -1];
+
+  const state = {
+    img: shape('Carré'),
+    nums: true,
+    kernel: KERNELS.vertical.k.slice(),
+    kname: 'vertical',
+    sel: { r: 2, c: 1 },
+    psel: { r: 0, c: 0 },
+    img4: shape('Trait vertical'),
+  };
+
+  /* ---------- Calculs ---------- */
+  function conv(img, k) {
+    const out = [];
+    for (let r = 0; r < M; r++) for (let c = 0; c < M; c++) {
+      let s = 0;
+      for (let i = 0; i < 3; i++) for (let j = 0; j < 3; j++) s += img[(r + i) * N + c + j] * k[i * 3 + j];
+      out.push(s);
+    }
+    return out;
+  }
+  const relu = (v) => Math.max(0, v);
+  const block = (m, r, c) => [m[2 * r * M + 2 * c], m[2 * r * M + 2 * c + 1], m[(2 * r + 1) * M + 2 * c], m[(2 * r + 1) * M + 2 * c + 1]];
+  function pool(m) {
+    const out = [];
+    for (let r = 0; r < M / 2; r++) for (let c = 0; c < M / 2; c++) out.push(Math.max(...block(m, r, c)));
+    return out;
+  }
+  const sum = (a) => a.reduce((x, y) => x + y, 0);
+  const maxAbs = (...arrs) => Math.max(1e-9, ...arrs.flat().map(Math.abs));
+
+  function run(img) {
+    const mv = conv(img, FV), mh = conv(img, FH);
+    const pv = pool(mv.map(relu)), ph = pool(mh.map(relu));
+    const sv = sum(pv), sh = sum(ph);
+    const z = [sv - sh, sh - sv];
+    const e = z.map((x) => Math.exp(x * 0.3));
+    const t = e[0] + e[1];
+    return { mv, mh, pv, ph, sv, sh, z, p: [e[0] / t, e[1] / t] };
+  }
+
+  /* ---------- Rendu des grilles ---------- */
+  function pix(v) {
+    const g = Math.round(18 + v * 222);
+    return { bg: `rgb(${g},${g},${g})`, fg: v > 0.5 ? '#111' : '#ddd' };
+  }
+  function sgn(v, m) {
+    const a = Math.min(1, Math.abs(v) / m);
+    const p = Math.round(a * 85);
+    const col = v >= 0 ? 'var(--pos)' : 'var(--neg)';
+    return { bg: `color-mix(in srgb, ${col} ${p}%, var(--surface))`, fg: p > 45 ? 'var(--on-strong)' : 'var(--text)' };
+  }
+  function drawGrid(el, rows, cols, fn, cs) {
+    el.style.setProperty('--cs', cs);
+    el.style.gridTemplateColumns = `repeat(${cols}, var(--cs))`;
+    el.innerHTML = range(rows * cols).map((i) => {
+      const r = Math.floor(i / cols), c = i % cols, o = fn(i, r, c);
+      return `<div class="cell ${o.cls || ''}" data-r="${r}" data-c="${c}" style="background:${o.bg};color:${o.fg}">${o.text ?? ''}</div>`;
+    }).join('');
+  }
+
+  /* ---------- Dessin à la souris ou au doigt ---------- */
+  function paintable(el, getImg, onChange) {
+    let val = null;
+    const cellAt = (e) => {
+      const t = document.elementFromPoint(e.clientX, e.clientY);
+      const cell = t && t.closest ? t.closest('.cell') : null;
+      return cell && el.contains(cell) ? cell : null;
+    };
+    const apply = (cell) => {
+      if (!cell) return;
+      const i = +cell.dataset.r * N + +cell.dataset.c;
+      const img = getImg();
+      if (img[i] !== val) { img[i] = val; onChange(); }
+    };
+    el.addEventListener('pointerdown', (e) => {
+      const cell = cellAt(e);
+      if (!cell) return;
+      e.preventDefault();
+      try { el.setPointerCapture(e.pointerId); } catch (_) { /* sans importance */ }
+      val = 1 - getImg()[+cell.dataset.r * N + +cell.dataset.c];
+      apply(cell);
+    });
+    el.addEventListener('pointermove', (e) => { if (val !== null) apply(cellAt(e)); });
+    const stop = () => { val = null; };
+    el.addEventListener('pointerup', stop);
+    el.addEventListener('pointercancel', stop);
+  }
+
+  function presetButtons(el, onPick) {
+    el.innerHTML = '<span class="muted" style="font-size:.9rem">Formes :</span>' +
+      SHAPES.map((s, i) => `<button data-i="${i}">${s.label}</button>`).join('');
+    el.addEventListener('click', (e) => {
+      const b = e.target.closest('button');
+      if (b) onPick(SHAPES[+b.dataset.i].label);
+    });
+  }
+
+  /* ---------- Section 1 ---------- */
+  function render1() {
+    drawGrid($('#gImg'), N, N, (i) => ({ ...pix(state.img[i]), text: state.nums ? state.img[i] : '' }), CS8);
+  }
+
+  /* ---------- Section 2 ---------- */
+  let timer = null;
+  function stopAnim() {
+    if (timer) clearInterval(timer);
+    timer = null;
+    $('#btnAnim').textContent = '▶ Animer le balayage';
+  }
+  function render2() {
+    const { r, c } = state.sel, img = state.img, k = state.kernel;
+    drawGrid($('#gIn2'), N, N, (i, rr, cc) => ({
+      ...pix(img[i]), text: img[i],
+      cls: rr >= r && rr < r + 3 && cc >= c && cc < c + 3 ? 'win' : '',
+    }), CS8);
+    const out = conv(img, k);
+    const m = maxAbs(out);
+    drawGrid($('#gOut2'), M, M, (i, rr, cc) => ({
+      ...sgn(out[i], m), text: fmt(out[i]), cls: rr === r && cc === c ? 'sel' : '',
+    }), CS6);
+
+    const win = [], prod = [];
+    for (let i = 0; i < 3; i++) for (let j = 0; j < 3; j++) {
+      const p = img[(r + i) * N + c + j];
+      win.push(p); prod.push(p * k[i * 3 + j]);
+    }
+    const km = maxAbs(k), pm = maxAbs(prod);
+    const mini = (arr, style) => `<div class="grid nopaint" style="--cs:34px;grid-template-columns:repeat(3,34px)">` +
+      arr.map((v, i) => { const o = style(v); return `<div class="cell" style="background:${o.bg};color:${o.fg}">${fmt(v)}</div>`; }).join('') + '</div>';
+    const total = sum(prod);
+    $('#calc').innerHTML =
+      `<div class="muted" style="font-size:.88rem">Case de sortie (ligne ${r + 1}, colonne ${c + 1}) : fenêtre × filtre, case par case, puis somme.</div>` +
+      `<div class="blocks">` +
+      `<div class="mini"><h5>Fenêtre</h5>${mini(win, pix)}</div><div class="op">×</div>` +
+      `<div class="mini"><h5>Filtre</h5>${mini(k, (v) => sgn(v, km))}</div><div class="op">=</div>` +
+      `<div class="mini"><h5>Produits</h5>${mini(prod, (v) => sgn(v, pm))}</div>` +
+      `<div class="sumline">Somme = ${prod.map(fmt).join(' + ').replace(/\+ -/g, '- ')}<br>= <span style="color:var(--accent);font-size:1.3em">${fmt(total)}</span></div>` +
+      `</div>`;
+  }
+  function renderKernelUI() {
+    $('#presetsK').querySelectorAll('button').forEach((b) => b.classList.toggle('on', b.dataset.k === state.kname));
+    $('#kdesc').textContent = state.kname === 'custom'
+      ? 'Filtre personnalisé : tu as modifié les valeurs. Essaie par exemple de n\'allumer que le bord gauche du carré.'
+      : KERNELS[state.kname].desc;
+    $('#kname3').textContent = state.kname === 'custom' ? 'personnalisé' : KERNELS[state.kname].label;
+  }
+  function syncKernelInputs() {
+    $('#gK').querySelectorAll('input').forEach((inp, i) => { inp.value = String(+state.kernel[i].toFixed(2)); });
+  }
+  function initKernelUI() {
+    $('#presetsK').innerHTML = Object.entries(KERNELS)
+      .map(([id, o]) => `<button data-k="${id}">${o.label}</button>`).join('') +
+      '<button data-k="custom" disabled>Personnalisé</button>';
+    $('#presetsK').addEventListener('click', (e) => {
+      const b = e.target.closest('button');
+      if (!b || b.dataset.k === 'custom') return;
+      state.kname = b.dataset.k;
+      state.kernel = KERNELS[b.dataset.k].k.slice();
+      $('#presetsK [data-k=custom]').disabled = true;
+      syncKernelInputs(); renderKernelUI(); render2(); render3();
+    });
+    $('#gK').innerHTML = range(9).map(() => '<input type="number" step="0.1" inputmode="decimal">').join('');
+    $('#gK').addEventListener('input', (e) => {
+      const inputs = [...$('#gK').querySelectorAll('input')];
+      const i = inputs.indexOf(e.target);
+      if (i < 0) return;
+      const v = parseFloat(e.target.value);
+      state.kernel[i] = Number.isFinite(v) ? v : 0;
+      state.kname = 'custom';
+      $('#presetsK [data-k=custom]').disabled = false;
+      renderKernelUI(); render2(); render3();
+    });
+    syncKernelInputs(); renderKernelUI();
+
+    const pick = (e) => {
+      const cell = e.target.closest('.cell');
+      if (!cell) return;
+      const r = +cell.dataset.r, c = +cell.dataset.c;
+      if (r === state.sel.r && c === state.sel.c) return;
+      stopAnim();
+      state.sel = { r, c };
+      render2();
+    };
+    $('#gOut2').addEventListener('pointerover', pick);
+    $('#gOut2').addEventListener('click', pick);
+    $('#btnAnim').addEventListener('click', () => {
+      if (timer) { stopAnim(); return; }
+      let i = 0;
+      state.sel = { r: 0, c: 0 }; render2();
+      $('#btnAnim').textContent = '⏸ Arrêter';
+      timer = setInterval(() => {
+        i = (i + 1) % (M * M);
+        state.sel = { r: Math.floor(i / M), c: i % M };
+        render2();
+      }, 350);
+    });
+  }
+
+  /* ---------- Section 3 ---------- */
+  function render3() {
+    const fm = conv(state.img, state.kernel);
+    const act = fm.map(relu), pl = pool(act);
+    const m = maxAbs(fm);
+    const { r, c } = state.psel;
+    drawGrid($('#gRaw'), M, M, (i) => ({ ...sgn(fm[i], m), text: fmt(fm[i]) }), CS6);
+    drawGrid($('#gAct'), M, M, (i, rr, cc) => ({
+      ...sgn(act[i], m), text: fmt(act[i]),
+      cls: Math.floor(rr / 2) === r && Math.floor(cc / 2) === c ? 'win' : '',
+    }), CS6);
+    drawGrid($('#gPool'), M / 2, M / 2, (i, rr, cc) => ({
+      ...sgn(pl[i], m), text: fmt(pl[i]), cls: rr === r && cc === c ? 'sel' : '',
+    }), CS6);
+    const b = block(act, r, c);
+    $('#poolcalc').textContent = `Bloc 2×2 en haut à gauche de la case (${r + 1}, ${c + 1}) : max(${b.map(fmt).join(', ')}) = ${fmt(Math.max(...b))}`;
+  }
+  function initPoolHover() {
+    const pick = (e) => {
+      const cell = e.target.closest('.cell');
+      if (!cell) return;
+      const r = +cell.dataset.r, c = +cell.dataset.c;
+      if (r === state.psel.r && c === state.psel.c) return;
+      state.psel = { r, c };
+      render3();
+    };
+    $('#gPool').addEventListener('pointerover', pick);
+    $('#gPool').addEventListener('click', pick);
+  }
+
+  /* ---------- Section 4 ---------- */
+  function render4() {
+    const img = state.img4, R = run(img);
+    drawGrid($('#gDraw'), N, N, (i) => pix(img[i]), CS8);
+    drawGrid($('#kV'), 3, 3, (i) => ({ ...sgn(FV[i], 2), text: FV[i], }), '18px');
+    drawGrid($('#kH'), 3, 3, (i) => ({ ...sgn(FH[i], 2), text: FH[i], }), '18px');
+    const m = maxAbs(R.mv, R.mh);
+    const cm = (arr) => (i) => ({ ...sgn(arr[i], m), text: fmt(arr[i]) });
+    drawGrid($('#mV'), M, M, cm(R.mv), '26px');
+    drawGrid($('#mH'), M, M, cm(R.mh), '26px');
+    drawGrid($('#pV'), 3, 3, cm(R.pv), '40px');
+    drawGrid($('#pH'), 3, 3, cm(R.ph), '40px');
+    drawGrid($('#fV'), 1, 9, cm(R.pv), 'clamp(24px, 7.5vw, 38px)');
+    drawGrid($('#fH'), 1, 9, cm(R.ph), 'clamp(24px, 7.5vw, 38px)');
+    $('#dense').innerHTML =
+      `vertical &nbsp;&nbsp;&nbsp;= (somme carte V) - (somme carte H) = ${fmt(R.sv)} - ${fmt(R.sh)} = <b>${fmt(R.z[0])}</b><br>` +
+      `horizontal = (somme carte H) - (somme carte V) = ${fmt(R.sh)} - ${fmt(R.sv)} = <b>${fmt(R.z[1])}</b>`;
+    const pc = R.p.map((p) => Math.round(p * 100));
+    $('#barV').style.width = pc[0] + '%';
+    $('#barH').style.width = pc[1] + '%';
+    $('#pctV').textContent = pc[0] + ' %';
+    $('#pctH').textContent = pc[1] + ' %';
+    const best = R.p[0] >= R.p[1] ? 0 : 1;
+    const names = ['un trait vertical', 'un trait horizontal'];
+    const empty = img.every((v) => v === 0);
+    $('#verdict').textContent = empty
+      ? 'Dessine quelque chose pour commencer.'
+      : R.p[best] >= 0.8
+        ? `Je vois ${names[best]} (${pc[best]} %).`
+        : 'Je ne sais pas : aucun des deux motifs ne ressort clairement.';
+  }
+
+  /* ---------- Quiz ---------- */
+  const QUIZ = [
+    { q: 'Un filtre 3×3 glisse sur une image 8×8 (sans bordure ajoutée, pas de 1). Quelle taille fait la sortie ?',
+      o: ['8×8', '6×6', '3×3'], a: 1,
+      e: 'Le filtre ne peut se poser que sur 6 positions par ligne et par colonne.' },
+    { q: 'Que fait ReLU ?',
+      o: ['Remplace les nombres négatifs par 0', 'Divise la taille de la carte par 4', 'Additionne tous les pixels'], a: 0,
+      e: 'Seules les détections positives du motif sont conservées.' },
+    { q: 'À quoi sert le max pooling ?',
+      o: ['À inventer de nouveaux filtres', 'À réduire la carte et tolérer de petits décalages', 'À colorer l\'image'], a: 1,
+      e: 'On ne garde que le signal le plus fort de chaque bloc 2×2.' },
+    { q: 'Dans un vrai CNN, qui choisit les valeurs des filtres ?',
+      o: ['Un ingénieur, filtre par filtre', 'Elles sont tirées au hasard et jamais modifiées', 'Le réseau les apprend en réduisant son erreur'], a: 2,
+      e: 'C\'est tout l\'intérêt : l\'apprentissage ajuste les filtres tout seul.' },
+  ];
+  function initQuiz() {
+    $('#quizBox').innerHTML = QUIZ.map((q, qi) =>
+      `<div class="q" data-qi="${qi}"><b>${qi + 1}. ${q.q}</b><div class="opts">` +
+      q.o.map((t, oi) => `<button data-oi="${oi}">${t}</button>`).join('') +
+      `</div><div class="fb"></div></div>`).join('');
+    $('#quizBox').addEventListener('click', (e) => {
+      const b = e.target.closest('button');
+      if (!b) return;
+      const box = b.closest('.q'), q = QUIZ[+box.dataset.qi], oi = +b.dataset.oi;
+      box.querySelectorAll('button').forEach((x) => x.classList.remove('good', 'bad'));
+      const ok = oi === q.a;
+      b.classList.add(ok ? 'good' : 'bad');
+      box.querySelector('.fb').textContent = ok ? 'Exact. ' + q.e : 'Pas tout à fait, réessaie.';
+    });
+  }
+
+  /* ---------- Démarrage ---------- */
+  function renderShared() { render1(); render2(); render3(); }
+
+  presetButtons($('#presets1'), (label) => { state.img = shape(label); renderShared(); });
+  presetButtons($('#presets4'), (label) => { state.img4 = shape(label); render4(); });
+  $('#showNums').addEventListener('change', (e) => { state.nums = e.target.checked; render1(); });
+  paintable($('#gImg'), () => state.img, renderShared);
+  paintable($('#gDraw'), () => state.img4, render4);
+  initKernelUI();
+  initPoolHover();
+  initQuiz();
+  renderShared();
+  render4();
+})();
+</script>
+</body>
+</html>

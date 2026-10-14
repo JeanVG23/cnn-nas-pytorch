@@ -26,8 +26,3 @@ Pour chaque chiffre : le jeu (`val` ou `test`) et le nombre de graines (1 graine
 
 Ce qui contredit la prédiction, ce qui n'a pas marché, avec la cause quand elle est établie.
 
-## 6. Questions à savoir traiter sans le dépôt
-
-1.
-2.
-3.
