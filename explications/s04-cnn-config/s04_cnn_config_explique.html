@@ -1,0 +1,1118 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Palier 4 : un CNN décrit par un dict</title>
+<style>
+:root {
+  --bg: #f7f7f4;
+  --surface: #ffffff;
+  --surface2: #efefe9;
+  --text: #1d1f23;
+  --muted: #5d6470;
+  --line: #d9d9d0;
+  --accent: #d9480f;
+  --pos: #ff922b;
+  --on-strong: #14161a;
+  --hl: #7048e8;
+  --ok: #2b8a3e;
+  --bad: #c92a2a;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #14161a;
+    --surface: #1d2026;
+    --surface2: #262a32;
+    --text: #eceae4;
+    --muted: #a0a6b0;
+    --line: #353a44;
+    --accent: #ff922b;
+    --hl: #9775fa;
+    --ok: #69db7c;
+    --bad: #ff8787;
+  }
+}
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; scroll-padding-top: 64px; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font: 16px/1.6 system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+.wrap { max-width: 980px; margin: 0 auto; padding: 0 16px; }
+
+/* En-tête et navigation */
+header.hero { padding: 40px 0 16px; }
+header.hero h1 { font-size: clamp(1.7rem, 5vw, 2.5rem); line-height: 1.2; margin: 0 0 12px; }
+.lead { font-size: 1.1rem; color: var(--muted); max-width: 68ch; margin: 0; }
+nav.top {
+  position: sticky; top: 0; z-index: 10;
+  background: color-mix(in srgb, var(--bg) 92%, transparent);
+  backdrop-filter: blur(6px);
+  border-bottom: 1px solid var(--line);
+}
+nav.top .wrap { display: flex; gap: 4px 14px; flex-wrap: wrap; padding-top: 10px; padding-bottom: 10px; }
+nav.top a { color: var(--muted); text-decoration: none; font-size: .9rem; font-weight: 600; }
+nav.top a:hover { color: var(--accent); }
+
+/* Sections */
+section { padding: 36px 0 8px; }
+section h2 { font-size: 1.5rem; margin: 0 0 8px; }
+section h2 .n {
+  display: inline-grid; place-items: center; width: 1.7em; height: 1.7em;
+  border-radius: 50%; background: var(--accent); color: #fff; font-size: .8em; margin-right: 8px;
+}
+@media (prefers-color-scheme: dark) { section h2 .n { color: #14161a; } }
+p { margin: 0 0 12px; max-width: 74ch; }
+a { color: var(--hl); }
+.muted { color: var(--muted); }
+.card {
+  background: var(--surface); border: 1px solid var(--line);
+  border-radius: 12px; padding: 16px; margin: 14px 0;
+}
+.card h3, .card h4 { margin: 0 0 6px; }
+.card h3 { font-size: 1.05rem; }
+code, .mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .92em; }
+.tip {
+  border-left: 4px solid var(--hl); background: var(--surface2);
+  padding: 10px 14px; border-radius: 0 8px 8px 0; margin: 14px 0; max-width: 74ch;
+}
+.warn {
+  border-left: 4px solid var(--bad); background: var(--surface2);
+  padding: 10px 14px; border-radius: 0 8px 8px 0; margin: 14px 0; max-width: 74ch;
+}
+
+/* Boutons et champs */
+.row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 10px 0; }
+button {
+  font: inherit; font-size: .9rem; cursor: pointer;
+  background: var(--surface); color: var(--text);
+  border: 1px solid var(--line); border-radius: 8px; padding: 6px 12px;
+}
+button:hover { border-color: var(--accent); }
+button.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+@media (prefers-color-scheme: dark) { button.on { color: #14161a; } }
+button:disabled { opacity: .5; cursor: default; }
+input[type="text"], input[type="number"], select {
+  font: 600 15px ui-monospace, Menlo, monospace; padding: 6px 10px; min-width: 0;
+  background: var(--surface); color: var(--text); border: 1px solid var(--line); border-radius: 8px;
+}
+input[type="text"] { width: min(100%, 30ch); }
+input[type="text"]:focus, input[type="number"]:focus, select:focus { outline: 2px solid var(--hl); }
+input[type="range"] { accent-color: var(--accent); width: min(100%, 320px); }
+label.f { font-size: .9rem; color: var(--muted); }
+
+/* Éditeur de config */
+.stg { display: grid; grid-template-columns: 70px minmax(170px, 1.6fr) auto auto auto; gap: 6px 16px; align-items: center; padding: 6px 0; border-top: 1px solid var(--line); }
+.stg:first-child { border-top: 0; }
+.stg label.f { display: flex; gap: 8px; align-items: center; }
+.stg input[type="range"] { flex: 1 1 100px; width: auto; min-width: 80px; }
+.stg output { font: 600 13px ui-monospace, Menlo, monospace; min-width: 3.2ch; text-align: right; color: var(--text); }
+.stg select { padding: 3px 6px; font-size: 14px; }
+.stats { display: flex; flex-wrap: wrap; gap: 10px 26px; margin: 8px 0; }
+.stat b { display: block; font: 700 1.25rem ui-monospace, Menlo, monospace; }
+.stat span { font-size: .8rem; color: var(--muted); }
+
+/* Extraits du vrai code, lus dans le fichier du projet via donnees/s04.js */
+.codeblock { margin: 12px 0; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); }
+.codeblock summary { cursor: pointer; padding: 8px 12px; font-weight: 600; }
+.codeblock summary .muted { font-weight: 400; }
+.codeblock pre { margin: 0; padding: 8px 12px; background: var(--surface2); border-top: 1px solid var(--line); font: 13px/1.6 ui-monospace, Menlo, monospace; overflow-x: auto; white-space: pre; }
+.codeblock .ln { display: inline-block; width: 3.2ch; margin-right: 1.2ch; color: var(--muted); text-align: right; user-select: none; }
+.codeblock .gap { color: var(--muted); padding-left: 4.4ch; }
+.codeblock .map { margin: 0; padding: 8px 12px; border-top: 1px solid var(--line); font-size: .92rem; }
+.predict { border: 2px solid var(--hl); border-radius: 10px; background: var(--surface); padding: 12px 14px; margin: 12px 0; }
+.predict h4 { margin: 0 0 6px; }
+.predict > p { max-width: 74ch; }
+.predict .tip { margin-bottom: 0; }
+.locked { opacity: .35; filter: grayscale(.5); pointer-events: none; }
+.porte-q { margin: 14px 0; }
+.porte-q textarea { width: 100%; min-height: 96px; font: inherit; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); color: var(--text); resize: vertical; }
+.porte-q .pts { margin-top: 8px; }
+.porte-q .pts label { display: flex; gap: 8px; align-items: flex-start; margin: 6px 0; cursor: pointer; }
+.porte-q .pts input { margin-top: 5px; accent-color: var(--accent); flex: 0 0 auto; }
+.resume { max-width: 74ch; padding-left: 1.4em; }
+.resume li { margin: 6px 0; }
+
+/* Tables */
+.tblwrap { overflow-x: auto; padding-bottom: 6px; }
+.tblwrap.tall { max-height: 340px; overflow-y: auto; border: 1px solid var(--line); border-radius: 8px; }
+table.pt { border-collapse: collapse; font-size: .9rem; width: 100%; }
+table.pt th, table.pt td { padding: 5px 8px; border-bottom: 1px solid var(--line); text-align: left; white-space: nowrap; }
+table.pt th { color: var(--muted); font-size: .8rem; }
+table.pt td.num { font-family: ui-monospace, Menlo, monospace; text-align: right; }
+table.pt td.wrap2 { white-space: normal; min-width: 180px; }
+table.pt tr.st1 td { background: color-mix(in srgb, var(--accent) 7%, var(--surface)); }
+table.pt tr.head td { background: color-mix(in srgb, var(--hl) 9%, var(--surface)); }
+table.pt thead th { position: sticky; top: 0; background: var(--surface); }
+.up { color: var(--ok); font-weight: 700; }
+.down { color: var(--bad); font-weight: 700; }
+.two { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 14px; }
+.two h4 { font-size: .95rem; }
+
+/* Grille largeur x blocs */
+table.heat { border-collapse: separate; border-spacing: 3px; font: 600 12px ui-monospace, Menlo, monospace; }
+table.heat th { color: var(--muted); font-weight: 700; padding: 3px 8px; text-align: center; }
+table.heat th.rowh { text-align: right; white-space: nowrap; }
+table.heat td { min-width: 108px; padding: 6px 4px; text-align: center; border: 1px solid var(--line); border-radius: 6px; cursor: pointer; line-height: 1.35; }
+table.heat td.hot { color: var(--on-strong); }
+table.heat td.cur { outline: 3px solid var(--hl); outline-offset: 1px; }
+table.heat td small { display: block; font-weight: 500; font-size: 10px; opacity: .85; }
+table.heat td .tg { display: inline-block; background: var(--hl); color: #fff; border-radius: 99px; padding: 0 6px; font-size: 10px; margin-top: 2px; }
+
+/* Barres */
+.bar-row { display: grid; grid-template-columns: 190px 1fr 250px; gap: 10px; align-items: center; margin: 5px 0; font-size: .9rem; }
+.bar-row.pickable { cursor: pointer; }
+.bar { height: 18px; background: var(--surface2); border-radius: 9px; overflow: hidden; border: 1px solid var(--line); }
+.bar span { display: block; height: 100%; background: var(--accent); transition: width .15s; }
+.bar.alt span { background: var(--hl); }
+.formula { font: 13px/1.7 ui-monospace, Menlo, monospace; background: var(--surface2); border-radius: 8px; padding: 8px 12px; margin: 6px 0; overflow-x: auto; white-space: pre; }
+.verdict { font-size: 1.05rem; font-weight: 700; margin-top: 8px; }
+.bad { color: var(--bad); }
+.chk { font-size: .85rem; color: var(--muted); }
+.chk b { color: var(--ok); }
+
+/* Tailles spatiales */
+.fm { display: flex; flex-wrap: wrap; gap: 10px; align-items: flex-end; margin: 10px 0; }
+.fm .box { display: grid; justify-items: center; gap: 3px; font: 600 11px ui-monospace, Menlo, monospace; color: var(--muted); text-align: center; }
+.fm .box i { display: block; border: 2px solid var(--accent); background: color-mix(in srgb, var(--accent) 12%, var(--surface)); border-radius: 3px; }
+.fm .arrow { align-self: center; color: var(--muted); }
+
+/* Champ réceptif */
+.strip32 { display: grid; grid-template-columns: repeat(32, 1fr); gap: 1px; max-width: 640px; margin: 8px 0 4px; }
+.strip32 i { display: block; height: 22px; background: var(--surface2); border: 1px solid var(--line); }
+.strip32 i.in { background: color-mix(in srgb, var(--hl) 55%, var(--surface)); border-color: var(--hl); }
+.strip32 i.ctr { background: var(--accent); border-color: var(--accent); }
+
+/* Intervalles de confiance */
+.ci-row { display: grid; grid-template-columns: 120px 1fr 190px; gap: 10px; align-items: center; margin: 8px 0; font-size: .9rem; }
+.ci-track { position: relative; height: 26px; background: var(--surface2); border-radius: 6px; border: 1px solid var(--line); }
+.ci-track .whisk { position: absolute; top: 12px; height: 2px; background: var(--hl); }
+.ci-track .cap { position: absolute; top: 6px; width: 2px; height: 14px; background: var(--hl); }
+.ci-track .dot { position: absolute; top: 5px; width: 14px; height: 14px; margin-left: -7px; border-radius: 50%; background: var(--accent); border: 2px solid var(--surface); }
+.ci-axis { display: grid; grid-template-columns: 120px 1fr 190px; gap: 10px; font-size: .75rem; color: var(--muted); }
+.ci-axis div:nth-child(2) { display: flex; justify-content: space-between; }
+
+/* Quiz */
+.quiz-head { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; justify-content: space-between; margin-bottom: 4px; }
+.quiz-head .score { font-weight: 700; }
+.q { border: 1px solid var(--line); border-radius: 10px; padding: 14px; margin: 14px 0; background: var(--surface); }
+.q .qt { font-weight: 700; margin: 0 0 4px; max-width: none; }
+.q .hint { font-size: .85rem; color: var(--muted); margin: 0 0 8px; }
+.q .tag { display: inline-block; font-size: .7rem; font-weight: 700; letter-spacing: .03em; text-transform: uppercase; padding: 2px 8px; border-radius: 99px; background: var(--surface2); color: var(--muted); margin-right: 6px; vertical-align: 2px; }
+.q .tag.trap { background: var(--bad); color: #fff; }
+.q .tag.multi { background: var(--hl); color: #fff; }
+@media (prefers-color-scheme: dark) { .q .tag.trap, .q .tag.multi { color: #14161a; } }
+.opt { display: flex; gap: 10px; align-items: flex-start; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; margin: 6px 0; cursor: pointer; }
+.opt input { margin-top: 5px; accent-color: var(--accent); flex: 0 0 auto; }
+.opt .ot { min-width: 0; }
+.opt .why { display: none; font-size: .88rem; color: var(--muted); margin-top: 4px; }
+.q.done .opt { cursor: default; }
+.q.done .opt .why { display: block; }
+.opt.good { border-color: var(--ok); background: color-mix(in srgb, var(--ok) 13%, var(--surface)); }
+.opt.wrong { border-color: var(--bad); background: color-mix(in srgb, var(--bad) 13%, var(--surface)); }
+.opt.miss { border-color: var(--ok); border-style: dashed; }
+.q .explain { display: none; border-left: 4px solid var(--hl); background: var(--surface2); padding: 10px 14px; border-radius: 0 8px 8px 0; margin-top: 10px; }
+.q.done .explain { display: block; }
+.q .explain p { max-width: none; margin: 0 0 8px; }
+.q .res { font-weight: 700; margin-top: 8px; }
+.q .res.ok { color: var(--ok); } .q .res.part { color: var(--accent); } .q .res.ko { color: var(--bad); }
+
+footer { padding: 36px 0 60px; color: var(--muted); font-size: .85rem; }
+
+@media (max-width: 700px) {
+  .stg { grid-template-columns: 1fr 1fr; }
+  .stg b, .stg label:first-of-type { grid-column: 1 / -1; }
+  .bar-row { grid-template-columns: 1fr; gap: 2px; margin: 10px 0; }
+  .ci-row, .ci-axis { grid-template-columns: 1fr; gap: 2px; }
+  .ci-axis div:first-child, .ci-axis div:last-child { display: none; }
+  table.heat td { min-width: 78px; font-size: 11px; }
+}
+</style>
+</head>
+<body>
+
+<header class="hero">
+  <div class="wrap">
+    <h1>Un CNN décrit par un dict : que coûtent la largeur et la profondeur ?</h1>
+    <p class="lead">Palier 4 : le réseau du palier 3 devient une simple recette (un dict) lue par une fonction qui construit les couches. Tu vas fabriquer des configs, voir ce que PyTorch en fait (formes, paramètres, calculs), comprendre pourquoi <code>wide</code> compte près de 4 fois et <code>deep</code> 3 fois les paramètres de la baseline, puis lire le tableau de résultats du rapport avec un œil critique (une seule graine). Sept étapes, un quiz à la fin. Prérequis : <a href="../s03-cnn-cifar/s03_cnn_cifar_explique.html">la page du palier 3</a> (convolution, BatchNorm, tête).</p>
+  </div>
+</header>
+
+<nav class="top">
+  <div class="wrap">
+    <a href="#s1">1. Dict et couches</a>
+    <a href="#s2">2. Tailles</a>
+    <a href="#s3">3. Paramètres</a>
+    <a href="#s4">4. Largeur ou profondeur</a>
+    <a href="#s5">5. Champ réceptif</a>
+    <a href="#s6">6. Coût</a>
+    <a href="#s7">7. Résultats</a>
+    <a href="#bilan">Bilan</a>
+    <a href="#resume">Résumé</a>
+    <a href="#porte">Explique</a>
+    <a href="#quiz">Quiz</a>
+  </div>
+</nav>
+
+<main class="wrap">
+
+<div id="nodata" class="warn" hidden><b>Fichier de données introuvable.</b> Lance <code>uv run python explications/s04-cnn-config/scripts/exporter_s04.py</code> depuis la racine du projet : la page a besoin de <code>donnees/s04.js</code>. Le quiz reste utilisable.</div>
+
+<div class="card">
+  <h3>Ce qui est réel, ce qui est recalculé, ce qui n'est pas relancé</h3>
+  <p><b>Réel (exécuté par PyTorch, exporté par le script) :</b> les couches et les formes des trois configs du palier (<code>s03_equivalent</code>, <code>wide</code>, <code>deep</code>), leurs paramètres (94 762, 373 834, 288 746), leurs MACs (compteur <code>FlopCounterMode</code>), les messages d'erreur de <code>validate_config</code>, la taille de sortie des convolutions à noyau pair, le piège de la liste Python, une grille largeur × blocs de 24 réseaux construits, et le champ réceptif mesuré par gradient. <b>Du rapport :</b> les précisions et les temps (<code>experiments/results/s04.jsonl</code>, 1 graine). <b>Recalculé dans la page :</b> tout le reste (couches, paramètres, MACs, champ réceptif de <i>ta</i> config), contrôlé contre les valeurs de PyTorch. <b>Pas relancé :</b> aucun entraînement (le palier est déjà mesuré, sa prédiction est écrite dans le rapport, section 2). La page n'a donc pas de courbe d'entraînement, et le jeu test n'est jamais lu (le palier 4 n'a pas d'option <code>--test</code>).</p>
+</div>
+
+<div class="card" id="common">
+  <h3>Ta config</h3>
+  <p class="muted">C'est la recette que toutes les sections lisent. Choisis un préréglage ou règle les étages à la main : chaque ligne est un <code>stage(channels, kernel, blocks, pool)</code>. Les valeurs interdites (noyau pair, plus de 5 pooling) sont volontairement permises ici : la page te montrera le refus.</p>
+  <div class="row" id="presets"></div>
+  <div id="stagesEd"></div>
+  <div class="row"><button id="addStage">+ étage</button><button id="rmStage">- étage</button></div>
+  <div id="cfgmsg" class="muted"></div>
+  <div class="stats" id="cfgStats"></div>
+</div>
+
+<!-- 1 --------------------------------------------------------------- -->
+<section id="s1">
+  <h2><span class="n">1</span>Du dict aux couches : ce que construit <code>conv_stage</code></h2>
+  <p>Au palier 3, l'architecture était écrite en dur : trois blocs, 32, 64 et 128 canaux. Ici, elle est décrite par des <b>données</b> : une liste d'étages, chacun avec quatre clés. Pense à une recette de cuisine (le dict) et à un cuisinier (<code>conv_stage</code>) qui lit une ligne et empile <code>blocks</code> fois le trio Conv2d, BatchNorm2d, ReLU, puis ajoute un MaxPool2d si <code>pool</code> vaut vrai. Une recette se modifie, se tire au hasard, se compare ; un réseau écrit en dur, non : c'est ce qui en fera l'espace de recherche du futur NAS.</p>
+  <p><b>À toi :</b> dans « Ta config », passe l'étage 1 à 2 blocs, puis décoche son pooling. Regarde les lignes qui apparaissent ou disparaissent dans la table, et la forme de sortie de chaque couche.</p>
+  <div class="card">
+    <div class="formula" id="s1dict"></div>
+    <div class="tblwrap tall" id="s1layers"></div>
+    <div class="chk" id="s1check"></div>
+  </div>
+  <details class="codeblock" open data-code="27-35,65-81,84-99"><summary>Dans le code : <code>stage</code>, <code>conv_stage</code> et <code>ConfigCNN</code> <span class="muted">(<span class="cf"></span>)</span></summary><pre></pre><p class="map">Lignes 27-28 : <code>stage()</code> fabrique la ligne de recette. Lignes 31-35 : les trois configs du palier (<code>s03_equivalent</code>, <code>wide</code>, <code>deep</code>). Lignes 67-78 : la boucle <code>for b in range(st["blocks"])</code> ajoute un trio Conv2d, BatchNorm2d, ReLU par bloc ; seule la <i>première</i> convolution de l'étage reçoit <code>c_in</code>, les suivantes reçoivent <code>st["channels"]</code> (ligne 70), ce sont les convolutions C vers C. Lignes 79-80 : le MaxPool2d n'arrive qu'à la fin de l'étage. Ligne 94 : la tête, dont la taille ne dépend que du dernier étage.</p></details>
+
+  <h3 style="margin-top:22px">Un détail qui change tout : <code>nn.ModuleList</code></h3>
+  <p>À la ligne 89, les étages sont rangés dans <code>nn.ModuleList()</code> et le commentaire de la ligne 88 dit pourquoi. Pour mesurer ce que ça change, le script d'export a construit <i>le même réseau</i> avec une simple liste Python <code>[]</code> à la place, sans toucher au code du palier. Résultat mesuré : le réseau calcule toujours, mais après <code>model.double()</code> la tête passe en float64 alors que les étages restent en float32, et après <code>model.eval()</code> ils restent en mode train.</p>
+  <div class="card" id="s1trap">
+    <div class="tblwrap"><table class="pt" id="s1traptbl"></table></div>
+    <div class="chk" id="s1trapnote"></div>
+  </div>
+  <div class="tip">
+    <b>À retenir :</b> une config est une donnée, <code>conv_stage</code> la transforme en couches, et le rangement dans <code>nn.ModuleList</code> n'est pas un détail de style : sans lui, PyTorch ne « voit » pas les étages (ni l'optimiseur, ni <code>state_dict</code>, ni <code>.eval()</code>, ni <code>.double()</code>).
+  </div>
+</section>
+
+<!-- 2 --------------------------------------------------------------- -->
+<section id="s2">
+  <h2><span class="n">2</span>Tailles, noyaux et validation : refuser avant de construire</h2>
+  <p>Deux règles de taille suffisent. <b>Pooling :</b> chaque <code>MaxPool2d(2)</code> divise H et W par 2 en arrondissant vers le bas : 32, 16, 8, 4, 2, 1, puis 0, ce qui n'existe pas. <b>Convolution :</b> avec <code>padding = kernel // 2</code>, la taille de sortie vaut <code>H + 2·pad − k + 1</code> : elle est conservée pour un noyau impair et grandit de 1 pour un noyau pair (kernel=4, padding=2 : 33×33 au lieu de 32×32). Comme une config peut venir d'un algorithme de recherche, <code>validate_config</code> simule ces règles et refuse <i>avant</i> de construire quoi que ce soit, avec un message qui dit quel étage et pourquoi.</p>
+  <p><b>À toi :</b> dans « Ta config », ajoute des étages (tous avec pooling) jusqu'à en avoir 6, puis ramène-en à 5. Ensuite mets le noyau d'un étage à 4. Lis le message de refus, puis compare-le plus bas à celui de PyTorch.</p>
+  <div class="card">
+    <h4>Taille spatiale le long de ta config</h4>
+    <div class="fm" id="s2ladder"></div>
+    <div class="chk" id="s2count"></div>
+  </div>
+  <div class="two">
+    <div class="card">
+      <h4>Pourquoi le noyau doit être impair</h4>
+      <p class="muted">Sortie d'un <code>Conv2d(3, 8, k, padding=k // 2)</code> sur une image 32×32, mesurée par PyTorch.</p>
+      <div class="tblwrap"><table class="pt" id="s2kern"></table></div>
+    </div>
+    <div class="card">
+      <h4>Configs invalides : le message réel</h4>
+      <p class="muted">Clique un cas : la page applique sa propre validation et la compare à celle de <code>validate_config</code> (exécutée par l'export).</p>
+      <div class="row" id="s2cases"></div>
+      <div id="s2caseout"></div>
+    </div>
+  </div>
+  <details class="codeblock" open data-code="38-62,73"><summary>Dans le code : <code>validate_config</code> <span class="muted">(<span class="cf"></span>)</span></summary><pre></pre><p class="map">Lignes 41-42 : la liste d'étages doit être non vide. Ligne 45 : les clés doivent être exactement les quatre attendues. Lignes 47-50 : entiers supérieurs ou égaux à 1, et <code>isinstance(value, bool)</code> refuse <code>True</code>, qui est un entier en Python. Lignes 51-54 : noyau impair. Lignes 57-62 : la taille simulée (<code>size //= 2</code>) tombe à 0 au sixième pooling. Ligne 73 : le <code>padding</code> de la convolution, qui conserve la taille seulement si le noyau est impair.</p></details>
+  <div class="tip">
+    <b>À retenir :</b> 5 étages avec pooling sont acceptés (sortie 1×1), le sixième est refusé. La validation protège contre une taille nulle et un noyau pair avant tout calcul ; elle ne dit rien de la <i>qualité</i> de la config.
+  </div>
+</section>
+
+<!-- 3 --------------------------------------------------------------- -->
+<section id="s3">
+  <h2><span class="n">3</span>Compter les paramètres : trois formules suffisent</h2>
+  <p>Un paramètre est un nombre que l'entraînement peut modifier. Trois formules suffisent pour ce réseau. <b>Convolution :</b> chaque filtre regarde <code>c_in × k × k</code> valeurs et il y a <code>c_out</code> filtres, soit <code>c_out · c_in · k²</code> poids, sans biais (<code>bias=False</code>, la BatchNorm suivante le rend inutile, voir palier 3). <b>BatchNorm :</b> γ et β par canal, soit <code>2 · c</code> (les statistiques courantes ne sont pas des paramètres). <b>Linear :</b> <code>c · 10 + 10</code>. Exemple : la première convolution de la baseline fait 32 × 3 × 3 × 3 = 864.</p>
+  <p><b>À toi :</b> regarde la barre la plus longue de ta config. Quelle couche porte le plus de paramètres ? Double les canaux du dernier étage et regarde ce que devient sa barre et le total.</p>
+  <div class="card">
+    <div id="s3bars"></div>
+    <div class="chk" id="s3check"></div>
+  </div>
+  <div class="card" id="s3deep">
+    <h4>Les trois configs du palier, et ton calcul à la main</h4>
+    <div class="tblwrap"><table class="pt" id="s3named"></table></div>
+    <p style="margin-top:12px"><b>À toi :</b> calcule à la main le nombre de paramètres de <i>ta config</i> actuelle (conv + BatchNorm + Linear), écris-le ici, puis vérifie.</p>
+    <div class="row"><input type="text" id="s3mine" inputmode="numeric" placeholder="ton total" aria-label="Ton calcul du nombre de paramètres" autocomplete="off"><button id="s3verify" class="on">Vérifier</button></div>
+    <div id="s3mineout" class="muted"></div>
+    <h4 style="margin-top:14px">La formule posée pour <code>wide</code> dans le rapport (section 2), terme par terme</h4>
+    <div id="s3jean"></div>
+  </div>
+  <details class="codeblock" open data-code="69-77,94,120"><summary>Dans le code : ce que compte <code>n_params</code> <span class="muted">(<span class="cf"></span>)</span></summary><pre></pre><p class="map">Lignes 69-75 : la <code>Conv2d</code> avec <code>bias=False</code> (poids <code>c_out · c_in · k²</code>). Ligne 76 : la <code>BatchNorm2d</code> (2 · c paramètres). Ligne 94 : <code>Linear(c_in, 10)</code> avec son biais (<code>c · 10 + 10</code>). Ligne 120 : <code>sum(p.numel() for p in model.parameters())</code> compte exactement ces paramètres, ni les statistiques de BatchNorm ni rien d'autre : c'est ce nombre que la barre « total » de la page recalcule et compare à PyTorch.</p></details>
+  <div class="tip">
+    <b>À retenir :</b> ce sont les convolutions du <i>dernier</i> étage qui pèsent (c_in et c_out y sont les plus grands), pas les premières. La tête et BatchNorm pèsent moins de 2 % du total dans les trois configs.
+  </div>
+</section>
+
+<!-- 4 --------------------------------------------------------------- -->
+<section id="s4">
+  <h2><span class="n">4</span>Élargir ou approfondir : deux façons de payer</h2>
+  <p>Deux leviers font grossir le réseau. <b>Élargir</b> : multiplier tous les canaux par m. Une convolution compte <code>c_in × c_out</code> poids et <i>les deux</i> doublent, donc ses poids sont multipliés par 4 (sauf la première, dont <code>c_in = 3</code> ne bouge pas : ×2 seulement). <b>Approfondir</b> : ajouter des blocs par étage. Chaque bloc ajouté est une convolution C vers C, qui pèse <code>9 · C²</code> pour un noyau 3×3.</p>
+  <p><b>À toi :</b> clique des cases de la grille : elle charge la config (tous les étages à la largeur × m, avec b blocs) dans « Ta config ». Repère <code>wide</code> (×2, 1 bloc) et <code>deep</code> (×1, 2 blocs), puis constate qu'aucune case à 1 bloc ne coûte autant que <code>deep</code> (elle est encadrée par ×1,5 et ×2) : la config de même taille se trouve dans la note sous la grille.</p>
+  <div class="card">
+    <div class="tblwrap"><table class="heat" id="s4heat"></table></div>
+    <div class="chk" id="s4check"></div>
+    <div id="s4note" style="margin-top:10px"></div>
+  </div>
+  <details class="codeblock" open data-code="27-35"><summary>Dans le code : les trois configs <span class="muted">(<span class="cf"></span>)</span></summary><pre></pre><p class="map">Ligne 33 : <code>wide</code> double les canaux (64, 128, 256), 1 bloc par étage (la case « ×2, 1 bloc »). Ligne 34 : <code>deep</code> garde 32, 64, 128 mais passe à <code>blocks=2</code> (la case « ×1, 2 blocs »). Ligne 32 : <code>s03_equivalent</code>, la case « ×1, 1 bloc ». Les autres cases de la grille ne sont pas dans <code>CONFIGS</code> : elles ont été construites par l'export avec le même <code>build_model</code> pour la page.</p></details>
+  <div class="tip">
+    <b>À retenir :</b> élargir coûte presque le <i>carré</i> du facteur (×3,94 pour ×2), approfondir ajoute des convolutions C vers C (la seule de l'étage 3 pèse 147 456 paramètres, soit 51 % de <code>deep</code>). Deux configs de même taille peuvent donc être de formes très différentes.
+  </div>
+</section>
+
+<!-- 5 --------------------------------------------------------------- -->
+<section id="s5">
+  <h2><span class="n">5</span>Champ réceptif : ce que « voit » un pixel profond</h2>
+  <p>Un pixel de la dernière carte ne dépend pas de toute l'image, mais d'une fenêtre : son <b>champ réceptif</b>. Une convolution 3×3 voit 3 pixels de large ; en empiler une seconde, 5 ; un pooling double le « pas » entre deux pixels de la carte (un pas vaut alors 2 pixels de l'image), donc les convolutions qui suivent regardent plus large. Règle, avec <code>jump</code> le pas courant (1 au départ) : après une convolution, <code>rf += (k − 1) · jump</code> ; après un MaxPool 2, <code>rf += jump</code> puis <code>jump *= 2</code>.</p>
+  <p><b>À toi :</b> règle « Ta config » pour que le champ réceptif en fin de réseau couvre les 32 pixels de l'image (la bande ci-dessous devient entièrement violette), en gardant le moins de paramètres possible. Essaie : un noyau 5, un bloc de plus, un pooling de moins.</p>
+  <div class="card">
+    <div class="stats" id="s5stats"></div>
+    <div class="strip32" id="s5strip"></div>
+    <div class="chk" id="s5stripnote"></div>
+    <div class="tblwrap tall" id="s5steps" style="margin-top:8px"></div>
+  </div>
+  <div class="card" id="s5presets">
+    <h4>Les trois configs du palier</h4>
+    <div id="s5bars"></div>
+    <div class="chk" id="s5check"></div>
+  </div>
+  <div class="warn">
+    <b>Une hypothèse, pas un résultat.</b> Le champ réceptif de <code>deep</code> est bien plus grand que celui de la baseline : c'est une explication <i>plausible</i> de son gain. Mais le palier ne l'a pas testée : <code>deep</code> a aussi 3 fois plus de paramètres et 6 ReLU au lieu de 3, et <code>wide</code> gagne +5,24 points avec le <i>même</i> champ réceptif que la baseline. Cette notion n'est pas dans le code du palier : elle est ajoutée par cette page (calcul vérifié par PyTorch, mesuré par gradient sur une variante du réseau).
+  </div>
+  <div class="tip">
+    <b>À retenir :</b> baseline et <code>wide</code> : 22 pixels, <code>deep</code> : 36. Le champ réceptif dépend des noyaux, du nombre de convolutions empilées et des pooling, <i>pas du nombre de canaux</i>. Élargir ne change pas ce que chaque pixel peut voir.
+  </div>
+</section>
+
+<!-- 6 --------------------------------------------------------------- -->
+<section id="s6">
+  <h2><span class="n">6</span>Paramètres, MACs, temps : trois façons de mesurer un coût</h2>
+  <p>Trois nombres, trois questions. <b>Paramètres :</b> combien de nombres à stocker et à apprendre. <b>MACs :</b> combien de multiplications-accumulations dans une passe avant (1 MAC = 2 FLOPs, convention du plan). Pour une convolution, <code>MACs = c_out · c_in · k² · H · W</code>, soit <i>les paramètres × le nombre de positions</i> : un même poids est réutilisé à chaque position de la carte. <b>Temps :</b> ce que la machine met réellement. Les premiers étages ont de grandes cartes (peu de paramètres, beaucoup de positions) et les derniers de petites (beaucoup de paramètres, peu de positions) : les trois nombres ne classent donc pas forcément les réseaux dans le même ordre.</p>
+  <p><b>À toi :</b> regarde les deux barres de chaque étage de ta config. Quel étage porte le plus de paramètres ? Le plus de MACs ? Ajoute un bloc au premier étage et regarde lequel des deux totaux bouge le plus.</p>
+  <div class="card">
+    <div id="s6stage"></div>
+    <div class="chk" id="s6check"></div>
+  </div>
+  <div class="card" id="s6cmp">
+    <h4>Les trois configs du palier : trois classements</h4>
+    <div class="row" id="s6metric"></div>
+    <div id="s6bars"></div>
+    <div class="tblwrap"><table class="pt" id="s6tbl"></table></div>
+  </div>
+  <div class="card">
+    <h4>Peut-on se fier à une mesure de temps unique ?</h4>
+    <p class="muted">Temps moyen par époque (<code>train_seconds / epochs</code>) de <i>la même architecture</i> (<code>s03_equivalent</code>, 94 762 paramètres), lu dans les résultats bruts du palier 3 et du palier 4.</p>
+    <div id="s6noise"></div>
+  </div>
+  <details class="codeblock" open data-code="123,133"><summary>Dans le code : d'où vient le temps <span class="muted">(<span class="cf"></span>)</span></summary><pre></pre><p class="map">Ligne 123 : <code>fit</code> entraîne le réseau (le temps d'entraînement est celui de <code>fit</code>, évaluation exclue). Ligne 133 : la ligne JSONL enregistre <code>train_seconds</code>, une seule valeur par run. Les MACs ne sont pas dans le code du palier 4 : ils sont calculés ici par la formule ci-dessus et contrôlés contre <code>FlopCounterMode</code> (exporté) ; le palier 5 les mesurera dans son propre code.</p></details>
+  <div class="tip">
+    <b>À retenir :</b> <code>wide</code> et <code>deep</code> ont presque les mêmes MACs (39,5 M et 38,6 M, écart de 2 %) alors que leurs paramètres diffèrent de 23 % : ni l'un ni l'autre n'explique à lui seul un temps. Et une mesure de temps unique est fragile : la même architecture a pris de 4,6 à 8,9 s par époque selon le run. Le palier 5 mesurera la latence avec une boucle à échauffement, synchronisation et médiane.
+  </div>
+</section>
+
+<!-- 7 --------------------------------------------------------------- -->
+<section id="s7">
+  <h2><span class="n">7</span>Lire les résultats : une graine, une barre d'erreur, des prédictions</h2>
+  <p>Le rapport donne pour chaque config <i>une</i> précision de validation, mesurée sur 5 000 images, après 10 époques, graine 0. Deux sources d'incertitude : le <b>tirage des images</b> de validation (si on en prenait 5 000 autres, le score bougerait : écart-type binomial <code>√(p(1 − p) / n)</code>) et l'<b>aléa de l'entraînement</b> (une autre graine donnerait un autre réseau). Avec une seule graine, on ne peut estimer que la première.</p>
+  <p><b>À toi :</b> déplace le curseur de taille du jeu de validation : à partir de quel <code>n</code> l'écart minimal détectable passe-t-il sous 1 point ? Puis regarde si les écarts mesurés entre les trois configs dépassent l'incertitude de tirage.</p>
+  <div class="card">
+    <div class="row"><label class="f">Images de validation n : <input type="range" id="s7n" min="0" max="5" step="1" value="3"> <b id="s7nout" style="white-space:nowrap"></b></label></div>
+    <div class="ci-axis"><div></div><div><span>70 %</span><span>75 %</span><span>80 %</span><span>85 %</span><span>90 %</span></div><div></div></div>
+    <div id="s7int"></div>
+    <div id="s7gaps" style="margin-top:8px"></div>
+  </div>
+  <div class="card">
+    <h4>Prédictions du rapport (section 2) contre mesures</h4>
+    <p class="muted">La prédiction de Jean est écrite et figée dans le rapport. Cette table la relit : les nombres viennent des mesures, le verdict de chaque ligne est celui de la page.</p>
+    <div class="tblwrap"><table class="pt" id="s7pred"></table></div>
+  </div>
+  <div class="card">
+    <h4>Deux comparaisons à ne pas faire</h4>
+    <div id="s7trap"></div>
+  </div>
+  <details class="codeblock" open data-code="steps/s04_cnn_config.py@125-137;common/train.py@72-73"><summary>Dans le code : le protocole des runs <span class="muted">(<span class="cf"></span>)</span></summary><pre></pre><p class="map">Lignes 125-137 de <code>s04_cnn_config.py</code> : la ligne enregistrée par run (config, graine, époques, <code>lr</code>, paramètres, temps, <code>val_loss</code>, <code>val_acc</code>). Lignes 72-73 de <code>common/train.py</code> : le même AdamW (<code>weight_decay=5e-4</code>) et le même <code>OneCycleLR</code> pour les trois configs, avec <code>lr=3e-3</code> non réglé pour chacune : la comparaison est « à hyperparamètres égaux », pas « chaque réseau à son meilleur ».</p></details>
+  <div class="tip">
+    <b>À retenir :</b> les écarts de +5,24 et +6,30 points dépassent largement l'incertitude de tirage (environ ±1,1 à 1,2 point par config, ±1,5 pour un écart), donc l'<i>ordre</i> baseline &lt; wide &lt; deep (+5,24 points pour wide, +11,54 pour deep) est solide <i>pour cette graine et ce budget</i>. Ce qu'une graine ne dit pas : si l'ordre tient avec d'autres graines, et <i>pourquoi</i> <code>deep</code> gagne.
+  </div>
+</section>
+
+<!-- Bilan ----------------------------------------------------------- -->
+<section id="bilan">
+  <h2><span class="n">8</span>Bilan</h2>
+  <div class="two">
+    <div class="card"><h3>Ce que ça prouve</h3>
+      <p>Un dict de quatre clés suffit à décrire les trois réseaux, et la config <code>s03_equivalent</code> redonne exactement les 94 762 paramètres du palier 3. Les comptes (373 834 et 288 746) et les MACs sont vérifiés par PyTorch. Avec des hyperparamètres identiques, 10 époques et la graine 0, la précision de validation est 74,82 % (baseline), 80,06 % (<code>wide</code>) et 86,36 % (<code>deep</code>), écarts supérieurs à l'incertitude de tirage des 5 000 images. <code>wide</code> et <code>deep</code> ont presque les mêmes MACs mais des temps par époque différents dans ces runs.</p></div>
+    <div class="card"><h3>Ce que ça ne prouve pas</h3>
+      <p>Que la profondeur gagne « grâce au champ réceptif » : <code>deep</code> a aussi 3 fois plus de paramètres et plus de non-linéarités, et aucune config à même nombre de paramètres n'a été entraînée. Que l'ordre tienne sur d'autres graines : il n'y en a qu'une. Que <code>deep</code> soit « intrinsèquement » 47 % plus lent que <code>wide</code> : le temps d'une même architecture varie de 4,6 à 8,9 s par époque entre runs, et la cause matérielle avancée dans le rapport n'a pas été mesurée. Que la baseline à 74,82 % soit moins bonne que celle du palier 3 (78,18 %) : le budget est de 10 époques contre 15.</p></div>
+  </div>
+  <div class="card" id="pont">
+    <h3>Où ça reviendra dans les prochaines étapes</h3>
+    <div class="tblwrap"><table class="pt">
+      <tr><th>Dans cette étape</th><th>Ce que ça devient ensuite (d'après le plan du projet)</th><th>Vu sur cette page ?</th></tr>
+      <tr><td class="wrap2">Config en dict, <code>stage()</code>, <code>validate_config</code></td><td class="wrap2">Palier 5 : la grille <code>GRID</code> (<code>tiny</code>, <code>s03</code>, <code>wide</code>, <code>deep</code>, <code>kernel5</code>, <code>late_pool</code>) est construite avec <code>build_model</code> et <code>stage</code>. Palier 6 (reporté) : le dict devient l'espace de recherche du random search.</td><td>Oui (sections 1, 2 et 4)</td></tr>
+      <tr><td class="wrap2">Comptage des paramètres</td><td class="wrap2">Palier 5 : <code>count_params</code>, colonne du tableau précision / paramètres / FLOPs / latence.</td><td>Oui (section 3)</td></tr>
+      <tr><td class="wrap2">MACs d'une convolution : paramètres × positions</td><td class="wrap2">Palier 5 : <code>count_flops</code> avec <code>FlopCounterMode</code>, 1 MAC = 2 FLOPs ; seuls les produits matriciels et les convolutions sont comptés (ni BatchNorm, ni ReLU, ni pooling).</td><td>Oui pour la formule ; le palier 5 la mesure</td></tr>
+      <tr><td class="wrap2">Temps mesuré une fois par config</td><td class="wrap2">Palier 5 : <code>measure_latency</code> à la main (échauffement, <code>synchronize</code>, médiane), sur mps et cpu, batch 1 et 64.</td><td>En partie : la fragilité oui, la méthode non</td></tr>
+      <tr><td class="wrap2">Une graine en exploration</td><td class="wrap2">Convention du projet : 3 graines pour les chiffres retenus, jeu test lu seulement avec <code>--test</code> en fin de palier 3 et 5.</td><td>Oui (section 7)</td></tr>
+      <tr><td class="wrap2">Champ réceptif</td><td class="wrap2">Pas prévu dans le plan : notion ajoutée par la page pour formuler une hypothèse. Un test serait une ablation (profondeur à paramètres constants).</td><td>Oui (section 5)</td></tr>
+    </table></div>
+  </div>
+  <div class="tip"><b>Limites de la page, et suite.</b> Les temps sont ceux du rapport (une mesure par config, sur mps), pas rejoués. Le champ réceptif est un calcul exact, mais « voir plus large » n'est pas démontré comme cause du gain. Le palier 5 ajoutera FLOPs et latence mesurés proprement, et comparera les configs sur la même grille.</div>
+</section>
+
+<section id="resume">
+  <h2><span class="n">9</span>Résumé en 10 lignes</h2>
+  <ol class="resume">
+    <li>Une config est <code>{"stages": [...]}</code> ; chaque étage a exactement 4 clés : <code>channels</code>, <code>kernel</code>, <code>blocks</code>, <code>pool</code> ; <code>conv_stage</code> empile <code>blocks</code> fois (Conv2d sans biais, BatchNorm2d, ReLU), puis un MaxPool2d(2) si <code>pool</code>.</li>
+    <li>La tête est imposée : <code>AdaptiveAvgPool2d((1, 1))</code>, <code>Flatten</code>, <code>Linear(c_dernier_étage, 10)</code> ; sa taille ne dépend pas de la taille spatiale, donc la profondeur peut varier, dans la limite de 5 étages avec pooling.</li>
+    <li>Les étages vont dans <code>nn.ModuleList</code> : avec une liste Python, <code>parameters()</code> ne voit que la tête (1 290 au lieu de 288 746 pour <code>deep</code>), <code>state_dict</code> n'a que 2 clés au lieu de 38, et <code>.eval()</code> et <code>.double()</code> n'atteignent pas les étages.</li>
+    <li><code>validate_config</code> refuse avant de construire : clés inexactes, entiers inférieurs à 1 (booléens compris), noyau pair (la sortie grandit de 1), <code>pool</code> non booléen, et le sixième pooling (32, 16, 8, 4, 2, 1, puis 0).</li>
+    <li>Paramètres : convolution <code>c_out · c_in · k²</code> (sans biais), BatchNorm <code>2 · c</code>, Linear <code>c · 10 + 10</code> ; la baseline fait 94 762, avec 77,8 % dans la dernière convolution.</li>
+    <li><code>wide</code> (canaux ×2) : 373 834 paramètres, soit ×3,94 ; <code>deep</code> (2 blocs par étage) : 288 746, soit ×3,05 ; la convolution 128 vers 128 de l'étage 3 pèse à elle seule 147 456 (51 % de <code>deep</code>).</li>
+    <li>MACs d'une convolution : <code>c_out · c_in · k² · H · W</code>, soit paramètres × positions : baseline 10,3 M, <code>wide</code> 39,5 M, <code>deep</code> 38,6 M ; <code>wide</code> et <code>deep</code> ont donc presque le même calcul pour 23 % d'écart de paramètres.</li>
+    <li>Champ réceptif : après une convolution <code>rf += (k − 1) · jump</code>, après un pooling <code>rf += jump</code> puis <code>jump *= 2</code> ; baseline et <code>wide</code> : 22 pixels, <code>deep</code> : 36 (toute l'image) ; il ne dépend pas du nombre de canaux, et le lien avec le gain de <code>deep</code> reste une hypothèse.</li>
+    <li>Résultats (graine 0, 10 époques, 5 000 images de validation) : baseline 74,82 %, <code>wide</code> 80,06 %, <code>deep</code> 86,36 % ; écarts de +5,24 et +6,30 points au-delà de l'incertitude de tirage (environ ±1,5 point pour un écart), mais une seule graine et des hyperparamètres non réglés par config.</li>
+    <li>Temps par époque : 4,6 s, 10,5 s et 15,5 s, mesure unique ; la baseline a pris de 4,6 à 8,9 s par époque selon le run (palier 3 et 4) : ne pas conclure sur 47 % sans mesures répétées ; la baseline à 10 époques (74,82 %) n'est pas comparable à celle du palier 3 à 15 époques (78,18 %).</li>
+  </ol>
+</section>
+
+<section id="porte">
+  <h2><span class="n">10</span>Explique avec tes mots</h2>
+  <p class="muted">Trois questions à savoir traiter sans le dépôt ni la page (le plan en fixe le principe, pas la liste : ce sont celles de cette page). Écris ta réponse sans regarder, puis révèle les points attendus et coche ceux que tu avais déjà. Ce que tu écris reste dans ce navigateur, nulle part ailleurs.</p>
+  <div class="card" id="porteBox"></div>
+</section>
+
+<section id="quiz">
+  <h2>Quiz : peux-tu expliquer le palier 4 ?</h2>
+  <p class="muted">Dix questions sur les points les plus sensibles. Certaines sont des pièges : chaque réponse, juste ou fausse, est expliquée après validation.</p>
+  <div class="card" id="quizBox"></div>
+</section>
+
+</main>
+
+<footer>
+  <div class="wrap">Page pédagogique autonome : aucun réseau, aucune dépendance, sauf le fichier voisin <code>donnees/s04.js</code>. Les chiffres viennent du code du projet exécuté par <code>scripts/exporter_s04.py</code> (couches, paramètres, MACs, messages d'erreur, piège de la liste, grille, champ réceptif) et du rapport <code>experiments/s04-cnn-config.md</code> avec <code>experiments/results/s04.jsonl</code> et <code>s03.jsonl</code> (précisions et temps). Les intervalles binomiaux, les verdicts de prédiction et le champ réceptif de ta config sont des calculs de la page.</div>
+</footer>
+
+<script src="donnees/s04.js"></script>
+<script>
+(() => {
+  const $ = (s) => document.querySelector(s);
+  const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  const fr = (x, d) => (Object.is(+x.toFixed(d), -0) ? 0 : x).toFixed(d).replace('.', ',');  // décimale française, pas de « -0,00 »
+  const sum = (a) => a.reduce((x, y) => x + y, 0);
+  const fmt = (n) => String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
+  const pc = (x, d = 1) => fr(x * 100, d) + ' %';
+  const D = window.S04;
+  if (!D) $('#nodata').hidden = false;
+
+  /* ---------- Le modèle du palier, recalculé en JavaScript (mêmes règles que steps/s04_cnn_config.py) ---------- */
+  const STAGE_KEYS = ['channels', 'kernel', 'blocks', 'pool'];
+  const pyRepr = (v) => {
+    if (v === true) return 'True';
+    if (v === false) return 'False';
+    if (typeof v === 'string') return "'" + v + "'";
+    if (Array.isArray(v)) return '[' + v.map(pyRepr).join(', ') + ']';
+    if (v && typeof v === 'object') return '{' + Object.entries(v).map(([k, x]) => "'" + k + "': " + pyRepr(x)).join(', ') + '}';
+    return String(v);
+  };
+  function validate(config) {   // même logique et mêmes messages que validate_config (lignes 38-62)
+    const stages = config && typeof config === 'object' && !Array.isArray(config) ? config.stages : undefined;
+    if (!Array.isArray(stages) || !stages.length) return "config['stages'] doit être une liste non vide d'étages";
+    let size = 32;
+    for (let i = 0; i < stages.length; i++) {
+      const st = stages[i];
+      const isDict = st && typeof st === 'object' && !Array.isArray(st);
+      if (!isDict || Object.keys(st).length !== 4 || !STAGE_KEYS.every((k) => k in st)) return `étage ${i} : clés attendues ${pyRepr([...STAGE_KEYS].sort())}, reçu ${pyRepr(st)}`;
+      for (const key of ['channels', 'kernel', 'blocks']) {
+        const v = st[key];
+        if (!Number.isInteger(v) || v < 1) return `étage ${i} : ${key} doit être un entier >= 1, reçu ${pyRepr(v)}`;
+      }
+      if (st.kernel % 2 === 0) return `étage ${i} : kernel doit être impair pour garder la taille avec padding, reçu ${st.kernel}`;
+      if (typeof st.pool !== 'boolean') return `étage ${i} : pool doit être un booléen, reçu ${pyRepr(st.pool)}`;
+      if (st.pool) {
+        size = Math.floor(size / 2);
+        if (size < 1) return `étage ${i} : la taille spatiale tombe à 0 (images 32x32 : au plus 5 étages avec pooling)`;
+      }
+    }
+    return null;
+  }
+  function layersOf(config) {   // couches, formes (C, H, W) et paramètres, comme model.stages puis model.head
+    const rows = [];
+    let c = 3, h = 32;
+    config.stages.forEach((st, i) => {
+      for (let b = 0; b < st.blocks; b++) {
+        rows.push({ stage: i + 1, name: 'Conv2d', out: [st.channels, h, h], params: st.channels * c * st.kernel * st.kernel, cin: c, cout: st.channels, k: st.kernel, block: b + 1 });
+        rows.push({ stage: i + 1, name: 'BatchNorm2d', out: [st.channels, h, h], params: 2 * st.channels });
+        rows.push({ stage: i + 1, name: 'ReLU', out: [st.channels, h, h], params: 0 });
+        c = st.channels;
+      }
+      if (st.pool) { h = Math.floor(h / 2); rows.push({ stage: i + 1, name: 'MaxPool2d', out: [c, h, h], params: 0 }); }
+    });
+    rows.push({ stage: 0, name: 'AdaptiveAvgPool2d', out: [c, 1, 1], params: 0 }, { stage: 0, name: 'Flatten', out: [c], params: 0 }, { stage: 0, name: 'Linear', out: [10], params: c * 10 + 10 });
+    return rows;
+  }
+  const totalParams = (config) => sum(layersOf(config).map((r) => r.params));
+  function costOf(config) {   // paramètres et MACs par étage (convolutions, BatchNorm) puis tête ; MACs = c_out · c_in · k² · H · W
+    const per = [];
+    let c = 3, h = 32;
+    config.stages.forEach((st) => {
+      let p = 0, m = 0;
+      for (let b = 0; b < st.blocks; b++) {
+        const w = st.channels * c * st.kernel * st.kernel;
+        p += w + 2 * st.channels; m += w * h * h; c = st.channels;
+      }
+      if (st.pool) h = Math.floor(h / 2);
+      per.push({ p, m });
+    });
+    per.push({ p: c * 10 + 10, m: c * 10, head: true });
+    return per;
+  }
+  const macsOf = (config) => sum(costOf(config).map((x) => x.m));
+  function rfOf(config) {   // champ réceptif à la fin du dernier étage
+    let rf = 1, j = 1;
+    const steps = [];
+    config.stages.forEach((st, i) => {
+      for (let b = 0; b < st.blocks; b++) { rf += (st.kernel - 1) * j; steps.push({ label: `étage ${i + 1}, conv ${b + 1} (${st.kernel}×${st.kernel})`, rf, j }); }
+      if (st.pool) { rf += j; j *= 2; steps.push({ label: `étage ${i + 1}, MaxPool 2`, rf, j }); }
+    });
+    return { rf, steps };
+  }
+  const stageCall = (s) => `stage(${s.channels}${s.kernel !== 3 ? ', kernel=' + s.kernel : ''}${s.blocks !== 1 ? ', blocks=' + s.blocks : ''}${s.pool ? '' : ', pool=False'})`;
+  const shapeText = (o) => (o.length === 1 ? `(${o[0]})` : `(${o.join(', ')})`);
+  const sameConfig = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+  const NAMES = ['s03_equivalent', 'wide', 'deep'];
+  const mkCfg = (st) => ({ stages: st.map((s) => ({ channels: s.channels, kernel: s.kernel, blocks: s.blocks, pool: s.pool })) });
+
+  /* ---------- État : la config du lecteur ---------- */
+  const CH = [4, 8, 16, 24, 32, 48, 56, 64, 96, 112, 128, 192, 224, 256, 384, 512];
+  const chIdx = (v) => CH.reduce((best, c, i) => (Math.abs(c - v) < Math.abs(CH[best] - v) ? i : best), 0);
+  const state = { stages: [], err: null, caseIdx: 2, metric: 'params', nIdx: 3 };
+  const cfg = () => mkCfg(state.stages);
+  const setConfig = (config) => { state.stages = mkCfg(config.stages).stages; buildEditor(); refresh(); };
+  const stageEditor = $('#stagesEd');
+
+  function buildEditor() {
+    stageEditor.innerHTML = state.stages.map((st, i) => `<div class="stg" data-i="${i}"><b>Étage ${i + 1}</b>
+      <label class="f">canaux <input type="range" min="0" max="${CH.length - 1}" value="${chIdx(st.channels)}" data-k="channels" aria-label="Canaux de l'étage ${i + 1}"><output>${st.channels}</output></label>
+      <label class="f">noyau <select data-k="kernel" aria-label="Noyau de l'étage ${i + 1}">${[1, 2, 3, 4, 5, 6, 7].map((v) => `<option${v === st.kernel ? ' selected' : ''}>${v}</option>`).join('')}</select></label>
+      <label class="f">blocs <select data-k="blocks" aria-label="Blocs de l'étage ${i + 1}">${[1, 2, 3, 4].map((v) => `<option${v === st.blocks ? ' selected' : ''}>${v}</option>`).join('')}</select></label>
+      <label class="f"><input type="checkbox" data-k="pool"${st.pool ? ' checked' : ''}> pooling</label></div>`).join('');
+    $('#addStage').disabled = state.stages.length >= 7;
+    $('#rmStage').disabled = state.stages.length <= 1;
+  }
+  stageEditor.addEventListener('input', (e) => {   // pas de reconstruction pendant le glissement : on met l'état à jour et on recalcule
+    const row = e.target.closest('.stg'); if (!row) return;
+    const st = state.stages[+row.dataset.i], k = e.target.dataset.k;
+    if (k === 'channels') { st.channels = CH[+e.target.value]; row.querySelector('output').textContent = st.channels; }
+    else if (k === 'pool') st.pool = e.target.checked;
+    else st[k] = +e.target.value;
+    refresh();
+  });
+  $('#addStage').addEventListener('click', () => { const last = state.stages[state.stages.length - 1]; state.stages.push({ channels: last ? last.channels : 32, kernel: 3, blocks: 1, pool: true }); buildEditor(); refresh(); });
+  $('#rmStage').addEventListener('click', () => { state.stages.pop(); buildEditor(); refresh(); });
+
+  const bad = (sel) => { $(sel).innerHTML = '<p class="muted">Config refusée par <code>validate_config</code> (message en haut, dans « Ta config ») : corrige-la pour voir ce calcul.</p>'; };
+
+  /* ---------- Contrôles contre PyTorch, faits une fois au démarrage ---------- */
+  const checks = {};
+  function runChecks() {
+    // couches des 3 configs
+    let nLayers = 0, okLayers = 0;
+    NAMES.forEach((n) => {
+      const mine = layersOf(D.named[n].config), ref = D.named[n].layers;
+      nLayers += ref.length;
+      mine.forEach((r, i) => { const q = ref[i]; if (q && r.name === q.name && r.stage === q.stage && r.params === q.params && sameConfig(r.out, q.out)) okLayers++; });
+      if (mine.length !== ref.length) okLayers -= 1000;
+    });
+    checks.layers = { n: nLayers, ok: okLayers === nLayers };
+    // paramètres et MACs : 3 configs puis 24 réseaux de la grille
+    checks.named = NAMES.every((n) => totalParams(D.named[n].config) === D.named[n].total && macsOf(D.named[n].config) === D.named[n].macs);
+    const gridCfg = (cell) => mkCfg(D.grid.base.map((c) => ({ channels: Math.floor(c * cell.mult), kernel: 3, blocks: cell.blocks, pool: true })));
+    checks.gridN = D.grid.cells.length;
+    checks.gridOk = D.grid.cells.filter((c) => totalParams(gridCfg(c)) === c.total && macsOf(gridCfg(c)) === c.macs).length;
+    checks.gridCfg = gridCfg;
+    // champ réceptif
+    checks.rfN = D.receptive.length;
+    checks.rfOk = D.receptive.filter((r) => rfOf(r.config).rf === r.rf).length;
+    // validation : messages identiques à ceux de Python
+    checks.valN = D.invalid.length;
+    checks.valOk = D.invalid.filter((c) => (validate(c.config) || null) === c.error).length;
+    // piège de la liste Python
+    const trapOk = NAMES.every((n) => {
+      const t = D.listTrap[n], c = D.named[n].config, last = c.stages[c.stages.length - 1].channels, blocks = sum(c.stages.map((s) => s.blocks));
+      return t.paramsModuleList === totalParams(c) && t.paramsList === last * 10 + 10 && t.stateKeysModuleList === 6 * blocks + 2 && t.stateKeysList === 2;
+    });
+    checks.trap = trapOk;
+  }
+
+  /* ---------- Rendu : « Ta config » (résumé) ---------- */
+  function renderCommon(c) {
+    if (state.err) {
+      $('#cfgmsg').innerHTML = `<div class="warn"><b>Config refusée par validate_config :</b> ${esc(state.err)}</div>`;
+      $('#cfgStats').innerHTML = '';
+      return;
+    }
+    $('#cfgmsg').innerHTML = '<span class="chk"><b>✓</b> config acceptée par <code>validate_config</code></span>';
+    const rf = rfOf(c).rf, p = totalParams(c), m = macsOf(c);
+    $('#cfgStats').innerHTML = [[fmt(p), 'paramètres'], [fr(m / 1e6, 1) + ' M', 'MACs (passe avant, 1 image)'], [rf + ' px', 'champ réceptif'], [fr(p / D.named.s03_equivalent.total, 2) + '×', 'paramètres / baseline']]
+      .map(([b, s]) => `<div class="stat"><b>${b}</b><span>${s}</span></div>`).join('');
+  }
+
+  /* ---------- Section 1 : du dict aux couches ---------- */
+  function renderS1(c) {
+    if (state.err) { bad('#s1layers'); $('#s1dict').textContent = ''; $('#s1check').textContent = ''; }
+    else {
+      $('#s1dict').textContent = '{"stages": [\n' + c.stages.map((s) => '    ' + stageCall(s) + ',').join('\n') + '\n]}';
+      const rows = layersOf(c);
+      $('#s1layers').innerHTML = '<table class="pt"><thead><tr><th>Étage</th><th>Couche</th><th>Sortie (C, H, W)</th><th>Paramètres</th></tr></thead><tbody>'
+        + rows.map((r) => `<tr class="${r.stage === 0 ? 'head' : r.stage % 2 ? 'st1' : ''}"><td>${r.stage === 0 ? 'tête' : r.stage}</td><td><code>${r.name}${r.name === 'Conv2d' ? `(${r.cin}, ${r.cout}, ${r.k})` : ''}</code></td><td class="num">${shapeText(r.out)}</td><td class="num">${r.params ? fmt(r.params) : '0'}</td></tr>`).join('')
+        + `</tbody></table>`;
+      $('#s1check').innerHTML = `${rows.length} couches, ${fmt(sum(rows.map((r) => r.params)))} paramètres pour ta config. Contrôle fait au chargement : pour les 3 configs du palier, les ${checks.layers.n} couches générées par la page (nom, forme, paramètres) sont ${checks.layers.ok ? '<b>✓ identiques</b>' : '<b class="bad">✗ différentes</b>'} à celles exécutées par PyTorch.`;
+    }
+    // piège ModuleList : les deux premières lignes suivent ta config
+    const t = D.listTrap.deep;
+    if (state.err) { $('#s1traptbl').innerHTML = ''; $('#s1trapnote').textContent = ''; return; }
+    const last = c.stages[c.stages.length - 1].channels, blocks = sum(c.stages.map((s) => s.blocks));
+    $('#s1traptbl').innerHTML = `<thead><tr><th>Mesure</th><th>nn.ModuleList (le code)</th><th>liste Python</th></tr></thead><tbody>
+      <tr><td><code>sum(p.numel() for p in model.parameters())</code> (ta config)</td><td class="num">${fmt(totalParams(c))}</td><td class="num">${fmt(last * 10 + 10)}</td></tr>
+      <tr><td>clés de <code>state_dict()</code> (ta config)</td><td class="num">${6 * blocks + 2}</td><td class="num">2</td></tr>
+      <tr><td>étages encore en mode train après <code>model.eval()</code> (mesuré sur deep)</td><td class="num">${t.stageStillTrainingAfterEvalModuleList ? 'oui' : 'non'}</td><td class="num">${t.stageStillTrainingAfterEval ? 'oui' : 'non'}</td></tr>
+      <tr><td>dtype du 1er étage après <code>model.double()</code> (mesuré sur deep)</td><td class="num">${t.stageDtypeAfterDoubleModuleList}</td><td class="num">${t.stageDtypeAfterDouble}</td></tr>
+      <tr><td><code>forward()</code> sur une image 32×32 (mesuré sur deep)</td><td class="num">fonctionne</td><td class="num">${t.forwardRuns ? 'fonctionne' : 'échoue'}</td></tr></tbody>`;
+    $('#s1trapnote').innerHTML = `Avec une liste Python, le réseau calcule normalement mais l'optimiseur ne voit que la tête : les étages resteraient à leur valeur initiale. Les deux premières lignes sont des formules (6 clés par bloc : poids de la convolution, γ, β, moyenne, variance et compteur de la BatchNorm ; 2 pour la tête) ; contrôle sur les 3 configs du palier : ${checks.trap ? '<b>✓ identiques à PyTorch</b>' : '<b class="bad">✗ écart</b>'}.`;
+  }
+
+  /* ---------- Section 2 : tailles, noyaux, validation ---------- */
+  function renderS2(c) {
+    let h = 32, pools = 0;
+    const boxes = [`<div class="box"><i style="width:${h * 2}px;height:${h * 2}px"></i>entrée<br>32×32</div>`];
+    c.stages.forEach((st, i) => {
+      if (st.pool) { h = Math.floor(h / 2); pools++; }
+      boxes.push('<span class="arrow">→</span>' + `<div class="box"><i style="width:${Math.max(h * 2, 3)}px;height:${Math.max(h * 2, 3)}px"></i>étage ${i + 1}<br>${h}×${h}${st.pool ? ' (pool)' : ''}${h === 0 ? '<br>impossible' : ''}</div>`);
+    });
+    $('#s2ladder').innerHTML = boxes.join('');
+    $('#s2count').innerHTML = `${pools} étage${pools > 1 ? 's' : ''} avec pooling sur 5 possibles. ${pools > 5 ? '<b class="bad">Au sixième pooling, la taille tombe à 0 : validate_config refuse.</b>' : 'Taille finale : ' + h + '×' + h + '.'}`;
+  }
+  function renderKern() {
+    $('#s2kern').innerHTML = '<thead><tr><th>kernel</th><th>padding</th><th>sortie (PyTorch)</th><th>H + 2·pad − k + 1</th><th></th></tr></thead><tbody>'
+      + D.kernelSizes.map((r) => `<tr><td class="num">${r.k}</td><td class="num">${r.padding}</td><td class="num">${r.out}</td><td class="num">${32 + 2 * r.padding - r.k + 1}</td><td>${r.out === 32 ? '<span class="up">taille conservée</span>' : '<span class="down">refusé</span>'}</td></tr>`).join('') + '</tbody>';
+  }
+  function renderCases() {
+    $('#s2cases').innerHTML = D.invalid.map((x, i) => `<button data-i="${i}" class="${i === state.caseIdx ? 'on' : ''}">${esc(x.label)}</button>`).join('');
+    const x = D.invalid[state.caseIdx], mine = validate(x.config);
+    const same = (mine || null) === x.error;
+    $('#s2caseout').innerHTML = `<div class="formula">${esc(pyRepr(x.config))}</div>
+      <p><b>PyTorch (export) :</b> ${x.error ? '<code>ValueError</code> : ' + esc(x.error) : `aucune erreur : la config est acceptée (sortie de taille ${shapeText(D.fiveStages.out)} pour un lot de 1)`}</p>
+      <p><b>La page :</b> ${mine ? esc(mine) : 'aucune erreur'} ${same ? '<b class="up">✓ identique</b>' : '<b class="down">✗ différent</b>'}</p>
+      <div class="chk">${checks.valOk} / ${checks.valN} messages de la page identiques à ceux de PyTorch.</div>`;
+  }
+  $('#s2cases').addEventListener('click', (e) => { const b = e.target.closest('button'); if (!b) return; state.caseIdx = +b.dataset.i; renderCases(); });
+
+  /* ---------- Section 3 : paramètres ---------- */
+  function renderS3(c) {
+    if (state.err) { bad('#s3bars'); $('#s3check').textContent = ''; $('#s3mineout').textContent = ''; return; }
+    const rows = layersOf(c), convs = rows.filter((r) => r.name === 'Conv2d'), total = sum(rows.map((r) => r.params));
+    const bn = sum(rows.filter((r) => r.name === 'BatchNorm2d').map((r) => r.params)), lin = rows.find((r) => r.name === 'Linear').params;
+    const items = convs.map((r) => ({ label: `étage ${r.stage}, bloc ${r.block} : ${r.cin} vers ${r.cout}`, v: r.params, calc: `${r.cout} × ${r.cin} × ${r.k} × ${r.k} = ${fmt(r.params)}` }))
+      .concat([{ label: 'BatchNorm2d (toutes)', v: bn, calc: `2 × (somme des canaux) = ${fmt(bn)}`, alt: true }, { label: 'Linear (tête)', v: lin, calc: `${lin - 10 > 0 ? (lin - 10) / 10 : 0} × 10 + 10 = ${fmt(lin)}`, alt: true }]);
+    const max = Math.max(...items.map((x) => x.v));
+    $('#s3bars').innerHTML = items.map((x) => `<div class="bar-row"><span>${x.label}</span><div class="bar${x.alt ? ' alt' : ''}"><span style="width:${(x.v / max * 100).toFixed(1)}%"></span></div><span>${x.calc} (${pc(x.v / total)})</span></div>`).join('')
+      + `<div class="verdict">Total : ${fmt(sum(convs.map((r) => r.params)))} (convolutions) + ${fmt(bn)} (BatchNorm) + ${fmt(lin)} (Linear) = ${fmt(total)}</div>`;
+    const named = NAMES.find((n) => sameConfig(c, D.named[n].config));
+    $('#s3check').innerHTML = named ? `Ta config est <code>${named}</code> : PyTorch compte ${fmt(D.named[named].total)} ${D.named[named].total === total ? '<b>✓ identique</b>' : '<b class="bad">✗ écart</b>'}.` : `Contrôle fait au chargement : la formule retrouve ${checks.named ? '<b>✓</b> les paramètres des 3 configs du palier' : '<b class="bad">✗ un écart</b>'} et ${checks.gridOk} / ${checks.gridN} des réseaux de la grille de la section 4, tous construits par PyTorch.`;
+  }
+  function renderNamed() {
+    const base = D.named.s03_equivalent.total;
+    $('#s3named').innerHTML = '<thead><tr><th>Config</th><th>Canaux</th><th>Blocs / étage</th><th>Paramètres (page)</th><th>Rapport à la baseline</th><th>PyTorch</th></tr></thead><tbody>'
+      + NAMES.map((n) => { const c = D.named[n].config, mine = totalParams(c); return `<tr><td><code>${n}</code></td><td class="num">${c.stages.map((s) => s.channels).join(', ')}</td><td class="num">${c.stages[0].blocks}</td><td class="num">${fmt(mine)}</td><td class="num">×${fr(mine / base, 2)}</td><td>${mine === D.named[n].total ? '<span class="up">✓ ' + fmt(D.named[n].total) + '</span>' : '<span class="down">✗</span>'}</td></tr>`; }).join('') + '</tbody>';
+    const w = D.named.wide.config, rows = layersOf(w), convs = rows.filter((r) => r.name === 'Conv2d'), cv = sum(convs.map((r) => r.params));
+    const bn = sum(rows.filter((r) => r.name === 'BatchNorm2d').map((r) => r.params)), lin = rows.find((r) => r.name === 'Linear').params, tot = cv + bn + lin;
+    const approx = cv + 1000 + 500;
+    $('#s3jean').innerHTML = `<div class="tblwrap"><table class="pt"><thead><tr><th>Terme</th><th>Posé dans le rapport</th><th>Réel (page, = PyTorch)</th></tr></thead><tbody>
+      <tr><td>convolutions</td><td class="num">3·3·3·64 + 3·3·64·128 + 3·3·128·256</td><td class="num">${convs.map((r) => fmt(r.params)).join(' + ')} = ${fmt(cv)}</td></tr>
+      <tr><td>tête Linear</td><td class="num">environ 1 000</td><td class="num">${fmt(lin)}</td></tr>
+      <tr><td>BatchNorm</td><td class="num">environ 500</td><td class="num">${fmt(bn)}</td></tr>
+      <tr><td>total</td><td class="num">environ ${fmt(approx)}</td><td class="num">${fmt(tot)}</td></tr></tbody></table></div>
+      <p class="muted">La partie qui compte (les convolutions, ${pc(cv / tot)} du total) est exacte ; les deux petits termes sont sous-estimés de ${fmt(lin - 1000)} et ${fmt(bn - 500)}, soit ${fr((tot - approx) / tot * 100, 1)} % du total : l'erreur est faible parce que ces termes pèsent peu, pas parce qu'ils étaient bien évalués.</p>`;
+  }
+  function verifyMine() {
+    const out = $('#s3mineout');
+    if (state.err) { out.textContent = 'Corrige d\'abord la config (message en haut).'; return; }
+    const raw = $('#s3mine').value.replace(/[\s  .,]/g, '');
+    if (!/^\d+$/.test(raw)) { out.textContent = 'Écris un entier, par exemple 288746 (les espaces sont acceptés).'; return; }
+    const v = +raw, c = cfg(), rows = layersOf(c), total = sum(rows.map((r) => r.params));
+    const bn = sum(rows.filter((r) => r.name === 'BatchNorm2d').map((r) => r.params)), lin = rows.find((r) => r.name === 'Linear').params;
+    const couts = sum(rows.filter((r) => r.name === 'Conv2d').map((r) => r.cout));
+    if (v === total) { out.innerHTML = `<b class="up">Exact : ${fmt(total)}.</b> ${fmt(total - bn - lin)} (convolutions) + ${fmt(bn)} (BatchNorm) + ${fmt(lin)} (Linear).`; return; }
+    const guesses = [[total - bn, 'tu as oublié les paramètres de BatchNorm'], [total - 10, 'tu as oublié le biais du Linear'], [total - lin, 'tu as oublié la tête Linear'], [total + couts, 'tu as compté un biais par filtre de convolution (bias=False dans le code)'], [total - bn - lin, 'tu n\'as compté que les convolutions']];
+    const g = guesses.find((x) => x[0] === v);
+    out.innerHTML = `<b class="down">Pas ${fmt(v)}.</b> Réponse : ${fmt(total)} (écart ${v > total ? '+' : '-'}${fmt(Math.abs(v - total))}). ${g ? 'Ton nombre correspond à un calcul où ' + g[1] + '.' : 'Refais terme par terme avec les barres ci-dessus.'}`;
+  }
+  $('#s3verify').addEventListener('click', verifyMine);
+  $('#s3mine').addEventListener('keydown', (e) => { if (e.key === 'Enter') verifyMine(); });
+
+  /* ---------- Section 4 : grille largeur x blocs ---------- */
+  function renderHeat() {
+    const cells = D.grid.cells, base = cells.find((x) => x.mult === 1 && x.blocks === 1).total, max = Math.max(...cells.map((x) => x.total));
+    const tag = (x) => (x.mult === 1 && x.blocks === 1 ? 's03_equivalent' : x.mult === 2 && x.blocks === 1 ? 'wide' : x.mult === 1 && x.blocks === 2 ? 'deep' : '');
+    const cur = cfg();
+    $('#s4heat').innerHTML = '<thead><tr><th></th>' + D.grid.blocks.map((b) => `<th>${b} bloc${b > 1 ? 's' : ''} / étage</th>`).join('') + '</tr></thead><tbody>'
+      + D.grid.widths.map((m) => `<tr><th class="rowh">canaux ×${fr(m, m % 1 ? 1 : 0)}<br><small>${D.grid.base.map((b) => Math.floor(b * m)).join(', ')}</small></th>`
+        + D.grid.blocks.map((b) => {
+          const x = cells.find((y) => y.mult === m && y.blocks === b), t = Math.round(Math.sqrt(x.total / max) * 85), isCur = !state.err && sameConfig(cur, checks.gridCfg(x));
+          return `<td data-m="${m}" data-b="${b}" class="${t > 45 ? 'hot' : ''}${isCur ? ' cur' : ''}" style="background:color-mix(in srgb, var(--pos) ${t}%, var(--surface))" tabindex="0" role="button" aria-label="Charger canaux fois ${m}, ${b} blocs">${fmt(x.total)}<small>×${fr(x.total / base, 2)}</small>${tag(x) ? `<span class="tg">${tag(x)}</span>` : ''}</td>`;
+        }).join('') + '</tr>').join('') + '</tbody>';
+  }
+  $('#s4heat').addEventListener('click', (e) => { const td = e.target.closest('td[data-m]'); if (td) setConfig(checks.gridCfg({ mult: +td.dataset.m, blocks: +td.dataset.b })); });
+  $('#s4heat').addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { const td = e.target.closest('td[data-m]'); if (td) { e.preventDefault(); setConfig(checks.gridCfg({ mult: +td.dataset.m, blocks: +td.dataset.b })); } } });
+  function renderS4Static() {
+    const base = D.named.s03_equivalent.total, wide = D.named.wide.total, deep = D.named.deep.total;
+    const deepConvs = layersOf(D.named.deep.config).filter((r) => r.name === 'Conv2d'), big = Math.max(...deepConvs.map((r) => r.params));
+    $('#s4check').innerHTML = `Contrôle : la formule de la page retrouve ${checks.gridOk === checks.gridN ? '<b>✓</b>' : '<b class="bad">✗</b>'} ${checks.gridOk} / ${checks.gridN} réseaux (paramètres et MACs) construits par PyTorch pour cette grille. Clique une case pour la charger dans « Ta config ».`;
+    $('#s4note').innerHTML = `<p><b>Élargir ×2 :</b> ${fmt(wide)} paramètres, soit ×${fr(wide / base, 2)} (pas ×2, presque ×4). <b>Doubler les blocs :</b> ${fmt(deep)}, soit ×${fr(deep / base, 2)} ; la plus grosse convolution de <code>deep</code> pèse ${fmt(big)} (${pc(big / deep, 0)} du total).</p>
+      <p><b>Même taille, autre forme :</b> avec des canaux ${D.iso.channels.join(', ')} et un seul bloc par étage, le réseau compte ${fmt(D.iso.total)} paramètres, à ${fr(Math.abs(deep - D.iso.total) / deep * 100, 1)} % de <code>deep</code> (${fmt(deep)}). Cette config, plus large que la baseline mais pas plus profonde, n'a pas été entraînée : c'est l'expérience qui séparerait l'effet de la profondeur de l'effet de la taille.</p>`;
+  }
+
+  /* ---------- Section 5 : champ réceptif ---------- */
+  function renderS5(c) {
+    if (state.err) { bad('#s5steps'); $('#s5stats').innerHTML = ''; $('#s5strip').innerHTML = ''; $('#s5stripnote').textContent = ''; return; }
+    const { rf, steps } = rfOf(c), shown = Math.min(32, rf), start = Math.floor((32 - shown) / 2);
+    $('#s5stats').innerHTML = `<div class="stat"><b>${rf} px</b><span>champ réceptif en fin de réseau</span></div><div class="stat"><b>${fmt(totalParams(c))}</b><span>paramètres</span></div><div class="stat"><b>${rf >= 32 ? 'oui' : 'non'}</b><span>couvre les 32 pixels de l'image</span></div>`;
+    $('#s5strip').innerHTML = Array.from({ length: 32 }, (_, i) => `<i class="${i >= start && i < start + shown ? (i === 15 || i === 16 ? 'in ctr' : 'in') : ''}"></i>`).join('');
+    $('#s5stripnote').textContent = rf > 32 ? `Une ligne de 32 pixels de l'image ; le champ réceptif (${rf}) dépasse l'image : les bords sont du padding de zéros.` : `Une ligne de 32 pixels de l'image : en violet, les ${rf} pixels vus par un pixel central de la dernière carte (en orange).`;
+    $('#s5steps').innerHTML = '<table class="pt"><thead><tr><th>Après</th><th>champ réceptif</th><th>jump (pas en pixels)</th></tr></thead><tbody>' + steps.map((s) => `<tr><td>${s.label}</td><td class="num">${s.rf}</td><td class="num">${s.j}</td></tr>`).join('') + '</tbody></table>';
+  }
+  function renderS5Presets() {
+    const rf = NAMES.map((n) => rfOf(D.named[n].config).rf);
+    $('#s5bars').innerHTML = NAMES.map((n, i) => `<div class="bar-row"><span><code>${n}</code></span><div class="bar"><span style="width:${(rf[i] / 36 * 100).toFixed(1)}%"></span></div><span>${rf[i]} px ${rf[i] >= 32 ? '(toute l\'image)' : `(${pc(rf[i] / 32, 0)} de la largeur)`}</span></div>`).join('');
+    $('#s5check').innerHTML = `Contrôle : le champ réceptif calculé par la règle ci-dessus ${checks.rfOk === checks.rfN ? '<b>✓</b>' : '<b class="bad">✗</b>'} retrouve ${checks.rfOk} / ${checks.rfN} mesures de PyTorch (gradient d'un pixel central de la sortie par rapport à l'entrée, sur une variante en AvgPool sans BatchNorm ni ReLU), dont deux configs de test aux noyaux 5 et 7.`;
+  }
+
+  /* ---------- Section 6 : paramètres, MACs, temps ---------- */
+  function renderS6(c) {
+    if (state.err) { bad('#s6stage'); $('#s6check').textContent = ''; return; }
+    const per = costOf(c), tp = sum(per.map((x) => x.p)), tm = sum(per.map((x) => x.m)), mp = Math.max(...per.map((x) => x.p)), mm = Math.max(...per.map((x) => x.m));
+    $('#s6stage').innerHTML = per.map((x, i) => {
+      const name = x.head ? 'tête (Linear)' : `étage ${i + 1}`;
+      return `<div class="bar-row"><span>${name} : paramètres</span><div class="bar"><span style="width:${(x.p / mp * 100).toFixed(1)}%"></span></div><span>${fmt(x.p)} (${pc(x.p / tp)})</span></div>`
+        + `<div class="bar-row"><span>${name} : MACs</span><div class="bar alt"><span style="width:${(x.m / mm * 100).toFixed(1)}%"></span></div><span>${fr(x.m / 1e6, 2)} M (${pc(x.m / tm)})</span></div>`;
+    }).join('') + `<div class="verdict">Total : ${fmt(tp)} paramètres, ${fr(tm / 1e6, 2)} M de MACs</div>`;
+    $('#s6check').innerHTML = `Contrôle : la formule des MACs retrouve ${checks.named ? '<b>✓</b>' : '<b class="bad">✗</b>'} le compteur de PyTorch (<code>FlopCounterMode</code>, FLOPs / 2) pour les 3 configs du palier et ${checks.gridOk} / ${checks.gridN} réseaux de la grille. Les MACs ne comptent que convolutions et Linear (ni BatchNorm, ni ReLU, ni pooling, ni biais).`;
+  }
+  const metrics = {
+    params: { label: 'Paramètres', get: (n) => D.named[n].total, show: (v) => fmt(v) },
+    macs: { label: 'MACs', get: (n) => D.named[n].macs, show: (v) => fr(v / 1e6, 1) + ' M' },
+    time: { label: 'Temps par époque (rapport)', get: (n) => { const r = D.runs.find((x) => x.config_name === n); return r.train_seconds / r.epochs; }, show: (v) => fr(v, 1) + ' s' },
+  };
+  function renderS6Cmp() {
+    $('#s6metric').innerHTML = Object.entries(metrics).map(([k, m]) => `<button data-k="${k}" class="${state.metric === k ? 'on' : ''}">${m.label}</button>`).join('');
+    const m = metrics[state.metric], vals = NAMES.map((n) => m.get(n)), max = Math.max(...vals), base = vals[0];
+    $('#s6bars').innerHTML = NAMES.map((n, i) => `<div class="bar-row"><span><code>${n}</code></span><div class="bar"><span style="width:${(vals[i] / max * 100).toFixed(1)}%"></span></div><span>${m.show(vals[i])} (×${fr(vals[i] / base, 2)})</span></div>`).join('');
+    const w = D.named.wide, d = D.named.deep, tw = metrics.time.get('wide'), td = metrics.time.get('deep');
+    $('#s6tbl').innerHTML = '<thead><tr><th>Config</th><th>Paramètres</th><th>MACs</th><th>Temps / époque</th></tr></thead><tbody>'
+      + NAMES.map((n) => `<tr><td><code>${n}</code></td><td class="num">${metrics.params.show(metrics.params.get(n))}</td><td class="num">${metrics.macs.show(metrics.macs.get(n))}</td><td class="num">${metrics.time.show(metrics.time.get(n))}</td></tr>`).join('')
+      + `<tr><td><b>deep contre wide</b></td><td class="num">${pc(d.total / w.total - 1, 0)}</td><td class="num">${pc(d.macs / w.macs - 1, 1)}</td><td class="num">+${pc(td / tw - 1, 0)}</td></tr></tbody>`;
+  }
+  $('#s6metric').addEventListener('click', (e) => { const b = e.target.closest('button'); if (!b) return; state.metric = b.dataset.k; renderS6Cmp(); });
+  function renderNoise() {
+    const rows = D.s03Ref.map((r, i) => ({ label: `palier 3, graine ${r.seed}${r.seed === 0 ? (i === 0 ? ' (exploration)' : ' (--test)') : ''}`, v: r.epoch_mean })).concat([{ label: 'palier 4, graine 0', v: metrics.time.get('s03_equivalent') }]);
+    const max = Math.max(...rows.map((r) => r.v)), min = Math.min(...rows.map((r) => r.v));
+    const tw = metrics.time.get('wide'), td = metrics.time.get('deep');
+    $('#s6noise').innerHTML = rows.map((r) => `<div class="bar-row"><span>${r.label}</span><div class="bar"><span style="width:${(r.v / max * 100).toFixed(1)}%"></span></div><span>${fr(r.v, 2)} s par époque</span></div>`).join('')
+      + `<p style="margin-top:8px">Pour <i>une même architecture</i>, le temps par époque varie d'un facteur ${fr(max / min, 2)} (de ${fr(min, 1)} à ${fr(max, 1)} s). L'écart de <code>deep</code> sur <code>wide</code> est d'un facteur ${fr(td / tw, 2)} dans des runs uniques. Le rapport l'explique par des passes convolutives séquentielles qui saturent mal le GPU : c'est plausible, mais ce n'est pas mesuré (aucun profil, aucune répétition). Le palier 5 prévoit une boucle avec échauffement, <code>synchronize</code> et médiane ; le plan ne dit pas qu'elle traite la variabilité entre runs, c'est à vérifier.</p>`;
+  }
+
+  /* ---------- Section 7 : résultats ---------- */
+  const NS = [500, 1000, 2000, 5000, 10000, 50000];
+  function renderS7() {
+    const n = NS[state.nIdx];
+    $('#s7nout').textContent = fmt(n);
+    const runs = NAMES.map((nm) => D.runs.find((r) => r.config_name === nm)), pos = (x) => Math.max(0, Math.min(100, (x - 0.70) / 0.20 * 100));
+    const half = runs.map((r) => 1.96 * Math.sqrt(r.val_acc * (1 - r.val_acc) / n));
+    $('#s7int').innerHTML = runs.map((r, i) => `<div class="ci-row"><span><code>${NAMES[i]}</code></span><div class="ci-track"><div class="whisk" style="left:${pos(r.val_acc - half[i])}%;width:${pos(r.val_acc + half[i]) - pos(r.val_acc - half[i])}%"></div><div class="cap" style="left:${pos(r.val_acc - half[i])}%"></div><div class="cap" style="left:${pos(r.val_acc + half[i])}%"></div><div class="dot" style="left:${pos(r.val_acc)}%"></div></div><span>${pc(r.val_acc, 2)} ± ${fr(half[i] * 100, 1)} pt</span></div>`).join('');
+    const pairs = [[0, 1], [0, 2], [1, 2]];
+    $('#s7gaps').innerHTML = pairs.map(([a, b]) => {
+      const gap = (runs[b].val_acc - runs[a].val_acc) * 100, h = Math.sqrt(half[a] ** 2 + half[b] ** 2) * 100;
+      return `<p style="margin:2px 0"><code>${NAMES[b]}</code> contre <code>${NAMES[a]}</code> : <b>+${fr(gap, 2)} points</b>, incertitude de l'écart ±${fr(h, 1)} : ${gap > h ? '<span class="up">l\'écart dépasse l\'incertitude de tirage</span>' : '<span class="down">écart noyé dans l\'incertitude de tirage</span>'}</p>`;
+    }).join('') + `<p class="muted" style="margin-top:8px">Intervalle à 95 % de l'écart-type binomial ${'√(p(1 − p) / n)'} des images tirées ; les écarts combinent les deux incertitudes (approximation prudente : les trois réseaux voient les mêmes images). Avec n = ${fmt(n)}, deux configs vers 80 % ne se distinguent qu'au-delà de ±${fr(1.96 * Math.SQRT2 * Math.sqrt(0.16 / n) * 100, 2)} point. Ces intervalles ne contiennent <b>pas</b> l'aléa de la graine : avec un seul run par config, il n'est pas estimable.</p>`;
+  }
+  $('#s7n').addEventListener('input', (e) => { state.nIdx = +e.target.value; renderS7(); });
+  function renderPred() {
+    const r = (nm) => D.runs.find((x) => x.config_name === nm), b = r('s03_equivalent'), w = r('wide'), d = r('deep');
+    const gw = (w.val_acc - b.val_acc) * 100, gd = (d.val_acc - b.val_acc) * 100, hw = 1.96 * Math.sqrt(Math.sqrt(b.val_acc * (1 - b.val_acc) / 5000) ** 2 + Math.sqrt(w.val_acc * (1 - w.val_acc) / 5000) ** 2) * 100;
+    const wideCv = sum(layersOf(D.named.wide.config).filter((x) => x.name === 'Conv2d').map((x) => x.params));
+    const ok = '<span class="up">✓</span>', ko = '<span class="down">✗</span>';
+    const rows = [
+      ['<code>wide</code> aura plus de temps de calcul', `${fr(w.train_seconds, 2)} s contre ${fr(b.train_seconds, 2)} s : ×${fr(w.train_seconds / b.train_seconds, 2)}`, ok + ' dans ces runs (mesures uniques, section 6)'],
+      ['<code>wide</code> ne sera pas meilleur', `+${fr(gw, 2)} points (incertitude de l'écart ±${fr(hw, 1)})`, ko + ' <code>wide</code> est meilleur'],
+      ['<code>deep</code> sera meilleur', `${pc(d.val_acc, 2)} contre ${pc(b.val_acc, 2)} : +${fr(gd, 2)} points`, ok],
+      ['<code>deep</code> sera meilleur « de l\'ordre de 5 % »', `+${fr(gd, 2)} points, soit +${fr(gd / (b.val_acc * 100) * 100, 1)} % en relatif`, ko + ' pour l\'ampleur, dans les deux lectures'],
+      ['paramètres de <code>wide</code> : la formule des convolutions, plus tête et normalisation', `${fmt(w.n_params)} réels ; convolutions exactes (${fmt(wideCv)}), tête et normalisation sous-estimées`, ok + ' pour l\'essentiel (section 3)'],
+      ['<code>deep</code> n\'aura pas beaucoup plus de paramètres que la baseline', `${fmt(d.n_params)} : ×${fr(d.n_params / b.n_params, 2)}`, ko],
+    ];
+    $('#s7pred').innerHTML = '<thead><tr><th>Ce qui était écrit</th><th>Mesuré</th><th>Verdict</th></tr></thead><tbody>' + rows.map((x) => `<tr><td class="wrap2">${x[0]}</td><td class="wrap2">${x[1]}</td><td class="wrap2">${x[2]}</td></tr>`).join('') + '</tbody>';
+    const s3 = D.s03Ref[0];
+    $('#s7trap').innerHTML = `<p><b>1. La baseline du palier 4 contre celle du palier 3.</b> ${pc(b.val_acc, 2)} ici (10 époques) contre ${pc(s3.val_acc, 2)} au palier 3 (15 époques) : même architecture (${fmt(s3.n_params)} paramètres), même graine 0, même jeu de validation. L'écart de ${fr((s3.val_acc - b.val_acc) * 100, 2)} points ne dit rien sur l'architecture : le budget d'époques diffère (et donc le planning <code>OneCycleLR</code>). Les précisions ne se comparent qu'à budget égal.</p>
+      <p><b>2. Largeur contre profondeur à taille égale.</b> <code>deep</code> (${fmt(d.n_params)} paramètres) bat <code>wide</code> (${fmt(w.n_params)}) avec moins de paramètres, mais les deux ne diffèrent pas que par la forme : aucune config de même taille (par exemple canaux ${D.iso.channels.join(', ')} : ${fmt(D.iso.total)} paramètres) n'a été entraînée, et hyperparamètres et graine sont fixes.</p>`;
+  }
+
+  /* ---------- Rafraîchissement global ---------- */
+  function refresh() {
+    if (!D) return;
+    const c = cfg();
+    state.err = validate(c);
+    renderCommon(c); renderS1(c); renderS2(c); renderS3(c); renderHeat(); renderS5(c); renderS6(c);
+  }
+
+  /* ---------- Quiz : toujours présent, 10 questions maximum ---------- */
+  // Une question = { q, multi, trap, ref, o: [{ t, ok, why }] }. 10 questions maximum.
+  const QUIZ = [
+    { q: 'Les étages sont rangés dans une liste Python ordinaire à la place de nn.ModuleList. Lesquelles de ces conséquences sont réelles ?', multi: true, trap: true, ref: '#s1',
+      o: [
+        { t: 'Leurs poids sont absents de model.parameters() : l\'optimiseur ne les met jamais à jour', ok: true, why: 'Vrai : 1 290 paramètres visibles au lieu de 288 746 pour deep (table de la section 1 une fois deep chargé, ou mesure de l\'export). Les étages calculent mais ne sont pas appris.' },
+        { t: 'model.double() convertit la tête en float64 mais laisse les étages en float32', ok: true, why: 'Vrai : mesuré par l\'export. Les étages ne sont pas enregistrés, donc les conversions de type les ratent.' },
+        { t: 'forward() échoue dès la construction du modèle avec une erreur explicite', ok: false, why: 'Faux : le réseau à liste Python calcule normalement. Le défaut est silencieux, ce qui le rend dangereux.' },
+        { t: 'model.eval() passe aussi les étages en mode évaluation, BatchNorm comprise', ok: false, why: 'Faux : après model.eval(), les étages sont restés en mode train (mesuré). Leur BatchNorm utiliserait encore les statistiques du lot.' },
+      ] },
+    { q: 'Pourquoi validate_config refuse-t-il un noyau pair comme kernel=4 ?', trap: true, ref: '#s2',
+      o: [
+        { t: 'Avec padding = k // 2, la sortie fait 33×33 : la taille n\'est plus conservée', ok: true, why: 'Vrai : H + 2·pad − k + 1 = 32 + 4 − 4 + 1 = 33 (table de la section 2).' },
+        { t: 'Un noyau pair a trop de poids et dépasse le budget de paramètres du palier', ok: false, why: 'Faux : la validation ne fixe aucun budget de paramètres ; un noyau 5 pèse plus qu\'un noyau 4 et reste accepté.' },
+        { t: 'La BatchNorm2d suivante exige un noyau impair pour calculer sa moyenne', ok: false, why: 'Faux : la BatchNorm travaille canal par canal et ignore la taille du noyau précédent.' },
+        { t: 'MaxPool2d(2) ne peut pas suivre une convolution à noyau pair du même étage', ok: false, why: 'Faux : le pooling n\'impose aucune contrainte sur le noyau ; c\'est la taille de sortie de la convolution qui pose problème.' },
+      ] },
+    { q: 'Config {"stages": [stage(8, pool=False)]} : une convolution 3×3 de 3 vers 8 canaux, BatchNorm, ReLU, puis la tête Linear vers 10 classes. Combien de paramètres ?', ref: '#s3',
+      o: [
+        { t: '322', ok: true, why: '3·8·3·3 = 216 (convolution sans biais) + 2·8 = 16 (γ et β) + 8·10 + 10 = 90 (Linear) = 322.' },
+        { t: '306', ok: false, why: '216 + 90 = 306 : ce calcul oublie les 16 paramètres de BatchNorm.' },
+        { t: '312', ok: false, why: '216 + 16 + 80 = 312 : ce calcul oublie les 10 biais du Linear.' },
+        { t: '330', ok: false, why: '216 + 8 + 16 + 90 = 330 : ce calcul ajoute un biais par filtre alors que la convolution est en bias=False.' },
+      ] },
+    { q: 'wide double les canaux (32, 64, 128 deviennent 64, 128, 256) et compte pourtant ×3,94 les paramètres de la baseline. Pourquoi un facteur proche de 4 ?', ref: '#s4',
+      o: [
+        { t: 'Les poids d\'une convolution valent c_out · c_in · k² : c_in et c_out doublent tous les deux', ok: true, why: 'Vrai : ×2 × ×2 = ×4 pour les convolutions, qui font 99 % du total ; la première convolution (c_in = 3) et la tête ne gagnent que ×2, d\'où 3,94.' },
+        { t: 'Le noyau passe de 3×3 à 6×6 quand on double les canaux, ce qui quadruple les poids', ok: false, why: 'Faux : le noyau reste 3×3 dans wide (ligne 33 du code). Seuls les canaux changent.' },
+        { t: 'Chaque étage de wide contient quatre blocs convolutifs au lieu d\'un seul', ok: false, why: 'Faux : wide a un bloc par étage ; c\'est deep qui change le nombre de blocs.' },
+        { t: 'BatchNorm et la tête Linear, qui pèsent le plus, voient leurs paramètres multipliés par 4', ok: false, why: 'Faux : BatchNorm et Linear pèsent moins de 2 % du total et sont multipliés par 2 seulement, comme les canaux.' },
+      ] },
+    { q: 'Dans deep, le second bloc de l\'étage 3 (canaux 128, noyau 3×3) est une convolution 128 vers 128. Combien de poids cette seule couche ajoute-t-elle ?', ref: '#s4',
+      o: [
+        { t: '147 456, soit 128 · 128 · 3 · 3', ok: true, why: 'Vrai : c\'est la plus grosse convolution de deep, 51 % de ses 288 746 paramètres.' },
+        { t: '49 152, soit 128 · 128 · 3', ok: false, why: 'Faux : le noyau est 3×3, donc k² = 9 et non 3.' },
+        { t: '16 384, soit 128 · 128 seulement', ok: false, why: 'Faux : ce calcul oublie le facteur k² = 9 du noyau.' },
+        { t: '294 912, soit 256 · 128 · 3 · 3', ok: false, why: 'Faux : ce calcul suppose que les canaux doublent (c\'est l\'élargissement de wide) ; ici c_in = c_out = 128.' },
+      ] },
+    { q: 'Par rapport à la baseline, que valent les champs réceptifs en fin de réseau de wide (canaux doublés) et de deep (2 blocs par étage) ?', trap: true, ref: '#s5',
+      o: [
+        { t: 'wide : identique à la baseline (22 px) ; deep : plus grand (36 px)', ok: true, why: 'Vrai : le champ réceptif dépend des noyaux, du nombre de convolutions et des pooling, pas du nombre de canaux (section 5).' },
+        { t: 'wide : plus grand, car plus de canaux voient plus d\'image ; deep : identique', ok: false, why: 'Faux : élargir n\'ajoute aucune couche ni noyau ; chaque pixel voit la même fenêtre, avec plus de filtres.' },
+        { t: 'wide et deep : identiques, car seul le pooling agrandit le champ réceptif', ok: false, why: 'Faux : chaque convolution ajoute (k − 1) · jump ; deep en a le double, d\'où 36 contre 22.' },
+        { t: 'wide et deep : plus grands, d\'autant que le nombre de paramètres augmente', ok: false, why: 'Faux : le nombre de paramètres n\'entre pas dans la règle ; deep a des convolutions de plus, wide non.' },
+      ] },
+    { q: 'deep gagne 11,54 points sur la baseline et son champ réceptif est bien plus grand. Peut-on conclure que le champ réceptif explique ce gain ?', trap: true, ref: '#s5',
+      o: [
+        { t: 'Non : deep a aussi 3 fois plus de paramètres et 6 ReLU, sans test isolant l\'effet', ok: true, why: 'Vrai : c\'est une hypothèse plausible. Il faudrait comparer à paramètres égaux (par exemple canaux 56, 112, 224 contre deep).' },
+        { t: 'Oui : le champ réceptif est la seule différence structurelle entre deep et la baseline', ok: false, why: 'Faux : deep diffère aussi par son nombre de paramètres (×3,05) et de non-linéarités.' },
+        { t: 'Oui, puisque wide, dont le champ réceptif n\'a pas bougé, n\'a pas du tout progressé', ok: false, why: 'Faux : wide progresse de +5,24 points avec le même champ réceptif que la baseline.' },
+        { t: 'Non, car le champ réceptif n\'influence pas la précision d\'un réseau convolutif', ok: false, why: 'Faux : rien ne l\'interdit, c\'est juste non démontré par ce palier.' },
+      ] },
+    { q: 'wide : 373 834 paramètres, 39,5 M de MACs, 10,5 s par époque. deep : 288 746 paramètres, 38,6 M de MACs, 15,5 s par époque. Que montre cette paire ?', ref: '#s6',
+      o: [
+        { t: 'Ni les paramètres ni les MACs ne suffisent à prédire le temps : il faut le mesurer', ok: true, why: 'Vrai : deep a moins de paramètres et à peu près les mêmes MACs que wide, et il est plus lent dans ces runs.' },
+        { t: 'Moins de paramètres veut dire moins de calcul, donc deep aurait dû être plus rapide', ok: false, why: 'Faux : les MACs valent paramètres × positions ; deep a moins de paramètres mais ses premiers étages travaillent sur de grandes cartes.' },
+        { t: 'Des MACs presque égaux entraînent des temps presque égaux sur une machine donnée', ok: false, why: 'Faux : d\'autres facteurs que les MACs peuvent peser sur le temps (hypothèse non mesurée ici), c\'est pourquoi on le mesure.' },
+        { t: 'Les MACs sont inutiles : le temps se déduit du nombre de paramètres', ok: false, why: 'Faux : wide et deep ont des paramètres différents de 23 % mais des MACs égaux à 2 %, et les temps diffèrent aussi.' },
+      ] },
+    { q: 'Le rapport attribue la lenteur de deep (+47 % par rapport à wide) à des passes convolutives séquentielles. Que montre l\'historique des temps de la baseline, mesurée plusieurs fois ?', trap: true, ref: '#s6',
+      o: [
+        { t: 'Elle a pris de 4,6 à 8,9 s par époque (×1,9) : un run unique ne suffit pas à conclure sur +47 %', ok: true, why: 'Vrai : la variation d\'une même architecture dépasse l\'écart observé entre wide et deep ; la cause avancée reste à mesurer.' },
+        { t: 'Ses temps sont stables à quelques pour cent : l\'écart de 47 % est donc certainement réel', ok: false, why: 'Faux : les temps de la baseline (4,59 à 8,86 s par époque) varient presque du simple au double.' },
+        { t: 'Elle a toujours pris 4,6 s par époque : le palier 3 paraissait plus lent à cause de ses 15 époques', ok: false, why: 'Faux : le temps est ramené à une époque ; trois des quatre runs du palier 3 font plus de 7 s par époque.' },
+        { t: 'Ses temps varient d\'environ 5 %, négligeable devant les 47 % mesurés pour deep', ok: false, why: 'Faux : la variation observée est d\'environ 90 %, bien plus que 5 %.' },
+      ] },
+    { q: 'La baseline du palier 4 atteint 74,82 % (10 époques) ; au palier 3, la même architecture et la même graine 0 donnaient 78,18 %. Comment lire ces 3,36 points ?', trap: true, ref: '#s7',
+      o: [
+        { t: 'Pas un effet d\'architecture : le budget d\'époques diffère (10 contre 15), donc non comparable', ok: true, why: 'Vrai : même nombre de paramètres, même graine, même validation ; le budget d\'époques est la différence connue, et une seule graine par palier ne sépare pas budget et bruit.' },
+        { t: 'Le dict de config dégrade légèrement le réseau par rapport au code écrit en dur du palier 3', ok: false, why: 'Faux : la config s03_equivalent redonne les mêmes couches et les mêmes 94 762 paramètres (section 1).' },
+        { t: 'L\'incertitude de tirage des 5 000 images de validation explique à elle seule ces 3,36 points', ok: false, why: 'Faux : le jeu de validation est le même aux deux paliers, et son incertitude est d\'environ ±1,2 point.' },
+        { t: 'La graine 0 est tombée sur un mauvais tirage : la baseline fait 78 % en 10 époques en moyenne', ok: false, why: 'Faux : rien dans les mesures ne le montre ; il n\'y a qu\'une graine et aucune moyenne à 10 époques.' },
+      ] },
+  ];
+  // La bonne réponse est écrite en premier ci-dessus : on tourne les propositions (ordre fixe, reproductible) pour varier sa position.
+  QUIZ.forEach((x, qi) => { const k = (qi * 3 + 1) % x.o.length; x.o = x.o.slice(k).concat(x.o.slice(0, k)); });
+  const quizState = QUIZ.map(() => null);
+  const quizBox = $('#quizBox');
+  const MISSED_KEY = 's04_cnn_config_quiz_missed';
+  const loadMissed = () => { try { return JSON.parse(localStorage.getItem(MISSED_KEY) || '[]'); } catch (e) { return []; } };
+  const saveMissed = (m) => { try { localStorage.setItem(MISSED_KEY, JSON.stringify(m)); } catch (e) { /* stockage indisponible : le quiz marche quand même */ } };
+  const shuffle = (a) => { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
+  let order = QUIZ.map((_, i) => i);
+  const hintOf = (x) => (x.multi ? 'Coche toutes les bonnes réponses.' : 'Une seule bonne réponse.');
+  function renderQuiz() {
+    quizBox.innerHTML = '<div class="quiz-head"><span class="score" id="qscore"></span><span class="row"><button id="qreset">↺ Recommencer</button><button id="qshuf">⇄ Mélanger</button><button id="qmiss"></button><button id="qall">Toutes les questions</button></span></div>'
+      + order.map((qi, pos) => { const x = QUIZ[qi]; return `<div class="q" data-q="${qi}">
+        <p class="qt"><span class="tag ${x.trap ? 'trap' : ''}">${x.trap ? 'Piège' : 'Question ' + (pos + 1)}</span>${x.multi ? '<span class="tag multi">Plusieurs réponses</span>' : ''}${x.q}</p>
+        <p class="hint">${hintOf(x)}</p>
+        ${x.o.map((o, oi) => `<label class="opt" data-o="${oi}"><input type="${x.multi ? 'checkbox' : 'radio'}" name="q${qi}"><span class="ot">${o.t}<span class="why">${o.ok ? '✓ Vrai. ' : '✗ Faux. '}${o.why}</span></span></label>`).join('')}
+        <div class="row"><button class="check on">Valider</button></div>
+        <div class="explain"><p class="res"></p>${x.ref ? `<p class="muted">À relire : <a href="${x.ref}">${x.ref}</a></p>` : ''}</div>
+      </div>`; }).join('');
+    updateScore(); updateMissedBtn();
+  }
+  function updateMissedBtn() {
+    const n = QUIZ.filter((x) => loadMissed().includes(x.q)).length, b = $('#qmiss');
+    b.textContent = `Refaire les ratées (${n})`; b.disabled = n === 0;
+    $('#qall').hidden = order.length === QUIZ.length;
+  }
+  function updateScore() {
+    const done = order.filter((qi) => quizState[qi]), right = done.filter((qi) => quizState[qi].right).length;
+    $('#qscore').textContent = `Score : ${right} / ${order.length}` + (done.length < order.length ? ` (${done.length} répondue${done.length > 1 ? 's' : ''})` : ' : terminé');
+  }
+  quizBox.addEventListener('click', (e) => {
+    if (e.target.id === 'qreset') { quizState.fill(null); renderQuiz(); return; }
+    if (e.target.id === 'qshuf') { shuffle(order); order.forEach((qi) => shuffle(QUIZ[qi].o)); quizState.fill(null); renderQuiz(); return; }
+    if (e.target.id === 'qmiss') { const m = loadMissed(); order = QUIZ.map((_, i) => i).filter((i) => m.includes(QUIZ[i].q)); quizState.fill(null); renderQuiz(); return; }
+    if (e.target.id === 'qall') { order = QUIZ.map((_, i) => i); quizState.fill(null); renderQuiz(); return; }
+    const btn = e.target.closest('button.check'); if (!btn) return;
+    const box = btn.closest('.q'), qi = +box.dataset.q, x = QUIZ[qi];
+    if (quizState[qi]) return;
+    const picked = [...box.querySelectorAll('.opt')].map((l) => l.querySelector('input').checked);
+    if (!picked.some(Boolean)) { box.querySelector('.hint').textContent = 'Choisis au moins une réponse.'; return; }
+    box.querySelector('.hint').textContent = hintOf(x);
+    let nbOk = 0, nbBad = 0;
+    box.querySelectorAll('.opt').forEach((l, oi) => {
+      const ok = x.o[oi].ok, sel = picked[oi];
+      l.classList.add(ok && sel ? 'good' : !ok && sel ? 'wrong' : ok ? 'miss' : 'neutral');
+      if (ok && sel) nbOk++;
+      if (!ok && sel) nbBad++;
+      l.querySelector('input').disabled = true;
+    });
+    const total = x.o.filter((o) => o.ok).length, right = nbOk === total && nbBad === 0;
+    quizState[qi] = { right };
+    const res = box.querySelector('.res');
+    res.className = 'res ' + (right ? 'ok' : nbOk > 0 && nbBad === 0 ? 'part' : 'ko');
+    res.textContent = right ? 'Correct.' : nbOk > 0 && nbBad === 0 ? `Incomplet : tu as trouvé ${nbOk} bonne(s) réponse(s) sur ${total}.` : 'Pas tout à fait.';
+    box.classList.add('done'); btn.disabled = true;
+    saveMissed(loadMissed().filter((t) => t !== x.q).concat(right ? [] : [x.q]));
+    updateScore(); updateMissedBtn();
+  });
+  renderQuiz();
+
+  /* ---------- Prédire avant de voir : la zone interactive reste grisée tant qu'on n'a pas répondu ---------- */
+  const PRED = [
+    { id: 'p1', target: '#s1trap', q: 'Les étages de deep sont rangés dans une liste Python au lieu de nn.ModuleList. Que renvoie alors sum(p.numel() for p in model.parameters()) ?',
+      o: ['288 746 : tous les paramètres, comme avec nn.ModuleList', '0 : aucun paramètre n\'est visible dans le modèle', '1 290 : seulement ceux de la couche Linear de la tête', '144 373 : la moitié, un étage sur deux est perdu'], ok: 2,
+      reveal: () => `PyTorch (export) : ${fmt(D.listTrap.deep.paramsList)} paramètres contre ${fmt(D.listTrap.deep.paramsModuleList)} avec nn.ModuleList. Les étages existent et calculent, mais le modèle ne les enregistre pas : le tableau ci-dessous le détaille.` },
+    { id: 'p2', target: '#s3deep', q: 'deep double le nombre de blocs par étage, canaux inchangés (32, 64, 128). Son nombre de paramètres, comparé aux 94 762 de la baseline, est environ :',
+      o: ['1,1 fois : la tête et BatchNorm ne changent presque pas', '2 fois : deux fois plus de blocs, deux fois plus de poids', '3 fois : chaque bloc ajouté est une convolution C vers C', '4 fois : le même facteur que quand on double les canaux'], ok: 2,
+      reveal: () => `${fmt(D.named.deep.total)} paramètres, soit ×${fr(D.named.deep.total / D.named.s03_equivalent.total, 2)}. Chaque deuxième convolution d'étage est C vers C : elle pèse 9·C², plus que la première dans les étages 2 et 3 (qui passe de C/2 à C). Vérifie dans le tableau ci-dessous.` },
+    { id: 'p3', target: '#s5presets', q: 'wide double tous les canaux (noyaux 3×3 inchangés). Son champ réceptif en fin de réseau, comparé à celui de la baseline, est :',
+      o: ['deux fois plus grand, comme les canaux', 'quatre fois plus grand, comme les paramètres', 'identique, car il ne dépend pas des canaux', 'plus petit, car les cartes sont plus denses'], ok: 2,
+      reveal: () => `Mesuré par gradient sur PyTorch : ${NAMES.map((n) => `${n} ${D.receptive.find((r) => r.name === n).rf} px`).join(', ')}. Les canaux ajoutent des filtres, pas de portée.` },
+    { id: 'p4', target: '#s6cmp', q: 'deep compte 23 % de paramètres en moins que wide (288 746 contre 373 834). Ses MACs, comparés à ceux de wide, sont :',
+      o: ['environ 23 % de moins, comme les paramètres', 'à peu près égaux, écart inférieur à 5 %', 'environ deux fois plus, car il est plus profond', 'environ deux fois moins, car ses cartes sont plus petites'], ok: 1,
+      reveal: () => `${fr(D.named.deep.macs / 1e6, 1)} M contre ${fr(D.named.wide.macs / 1e6, 1)} M : ${pc(D.named.deep.macs / D.named.wide.macs - 1, 1)}. Les poids du premier étage de deep s'appliquent à de grandes cartes 32×32 : peu de paramètres, beaucoup de positions.` },
+  ];
+  PRED.forEach((p) => {
+    const target = $(p.target); if (!target) return;
+    const box = document.createElement('div'); box.className = 'predict'; box.id = p.id;
+    box.innerHTML = `<h4>Prédis d'abord</h4><p>${p.q}</p>` + p.o.map((t, i) => `<label class="opt" data-o="${i}"><input type="radio" name="${p.id}"><span class="ot">${t}</span></label>`).join('')
+      + '<div class="row"><button class="on pv">Valider ma prédiction</button><button class="skip">Passer, je veux juste explorer</button></div><p class="muted pmsg"></p><div class="tip pres" hidden></div>';
+    target.before(box);
+    target.classList.add('locked'); target.setAttribute('inert', '');
+    const unlock = () => { target.classList.remove('locked'); target.removeAttribute('inert'); box.querySelectorAll('input,button').forEach((b) => { b.disabled = true; }); };
+    box.querySelector('.skip').addEventListener('click', unlock);
+    box.querySelector('.pv').addEventListener('click', () => {
+      const idx = [...box.querySelectorAll('input')].findIndex((i) => i.checked);
+      if (idx < 0) { box.querySelector('.pmsg').textContent = 'Choisis une réponse, ou passe.'; return; }
+      box.querySelectorAll('.opt').forEach((l, i) => l.classList.add(i === p.ok ? (i === idx ? 'good' : 'miss') : i === idx ? 'wrong' : 'neutral'));
+      const pres = box.querySelector('.pres'); pres.hidden = false;
+      pres.innerHTML = `<b>${idx === p.ok ? 'Bien vu.' : 'Pas tout à fait : tu avais prédit autre chose.'}</b> ${D ? p.reveal() : ''}`;
+      box.querySelector('.pmsg').textContent = '';
+      unlock();
+    });
+  });
+
+  /* ---------- Explique avec tes mots ---------- */
+  const PORTE = [
+    { q: 'Explique comment un dict de config devient un réseau, et pourquoi on valide la config avant de construire.', pts: [
+      'Un étage a 4 clés (channels, kernel, blocks, pool) ; conv_stage empile blocks fois Conv2d (sans biais), BatchNorm2d, ReLU, puis MaxPool2d(2) si pool.',
+      'La tête est imposée : AdaptiveAvgPool2d((1, 1)), Flatten, Linear(canaux du dernier étage, 10) ; sa taille ne dépend pas de la taille spatiale.',
+      'validate_config refuse avant de construire : clés inexactes, entiers inférieurs à 1, noyau pair (la taille n\'est plus conservée), pool non booléen, plus de 5 pooling sur 32×32.',
+      'Les étages sont rangés dans nn.ModuleList : avec une liste Python, parameters(), state_dict, .eval() et les conversions de type ne les voient pas.',
+    ] },
+    { q: 'Pourquoi wide compte ×3,94 les paramètres de la baseline et deep ×3,05 ? Où se concentrent les paramètres, et que disent les MACs ?', pts: [
+      'Formules : convolution c_out · c_in · k² (sans biais), BatchNorm 2 · c, Linear c · 10 + 10 ; baseline 94 762, wide 373 834, deep 288 746.',
+      'wide : c_in et c_out doublent, donc ×4 pour les convolutions (la première et la tête ne font que ×2) ; deep : chaque bloc ajouté est une convolution C vers C (128 vers 128 : 147 456, 51 % de deep).',
+      'Les paramètres se concentrent dans le dernier étage (grands canaux) ; les MACs = paramètres × positions, donc les premiers étages (grandes cartes) ont plus de MACs par paramètre, sans forcément avoir plus de MACs au total.',
+      'MACs : baseline 10,3 M, wide 39,5 M, deep 38,6 M ; wide et deep ont presque le même calcul pour 23 % d\'écart de paramètres.',
+    ] },
+    { q: 'Que montre le tableau de résultats du rapport, et que ne montre-t-il pas ?', pts: [
+      'Graine 0, 10 époques, 5 000 images : 74,82 %, 80,06 %, 86,36 % ; les écarts de +5,24 et +6,30 points dépassent l\'incertitude de tirage (environ ±1,5 point pour un écart).',
+      'Une seule graine : l\'aléa d\'entraînement n\'est pas estimé ; la convention du projet est 3 graines pour les chiffres retenus.',
+      'Il ne dit pas pourquoi deep gagne : le champ réceptif (36 px contre 22) est une hypothèse, deep a aussi 3 fois plus de paramètres ; aucune config à taille égale n\'a été entraînée.',
+      'Les temps (4,6, 10,5, 15,5 s par époque) sont des mesures uniques : la même architecture a pris de 4,6 à 8,9 s ; et la baseline à 10 époques n\'est pas comparable à celle du palier 3 à 15 époques.',
+    ] },
+  ];
+  const PORTE_KEY = 's04_cnn_config_porte';
+  const loadPorte = () => { try { return JSON.parse(localStorage.getItem(PORTE_KEY) || '{}'); } catch (e) { return {}; } };
+  const savePorte = (v) => { try { localStorage.setItem(PORTE_KEY, JSON.stringify(v)); } catch (e) { /* stockage indisponible */ } };
+  (() => {
+    const saved = loadPorte();
+    $('#porteBox').innerHTML = PORTE.map((x, i) => `<div class="porte-q" data-i="${i}"><p><b>${i + 1}.</b> ${x.q}</p>
+      <textarea aria-label="Ta réponse à la question ${i + 1}" placeholder="Écris ta réponse avec tes mots, sans regarder la page."></textarea>
+      <div class="row"><button class="on reveal">Voir les points attendus</button></div>
+      <div class="pts" hidden>${x.pts.map((t, k) => `<label><input type="checkbox" data-k="${k}"><span>${t}</span></label>`).join('')}<p class="muted sc"></p></div></div>`).join('');
+    document.querySelectorAll('.porte-q').forEach((box) => {
+      const i = +box.dataset.i, ta = box.querySelector('textarea'), s = saved[i] || {};
+      ta.value = s.text || '';
+      const score = () => { const n = box.querySelectorAll('.pts input:checked').length; box.querySelector('.sc').textContent = `Points que tu avais : ${n} / ${PORTE[i].pts.length}. Ceux que tu n'as pas cochés sont à relire dans la section correspondante (voir le résumé).`; };
+      const persist = () => { const all = loadPorte(); all[i] = { text: ta.value, got: [...box.querySelectorAll('.pts input')].map((c) => c.checked) }; savePorte(all); };
+      ta.addEventListener('input', persist);
+      box.querySelector('.reveal').addEventListener('click', () => { box.querySelector('.pts').hidden = false; box.querySelector('.reveal').disabled = true; score(); });
+      box.querySelectorAll('.pts input').forEach((c, k) => { c.checked = !!(s.got && s.got[k]); c.addEventListener('change', () => { score(); persist(); }); });
+    });
+  })();
+
+  /* ---------- Extraits de code : lus dans donnees/s04.js ---------- */
+  (() => {
+    const srcs = D && D.sources;
+    const first = srcs && Object.keys(srcs)[0];
+    document.querySelectorAll('.codeblock[data-code]').forEach((d) => {
+      if (!srcs) { d.hidden = true; return; }
+      const groups = d.dataset.code.split(';').map((gp) => { const at = gp.indexOf('@'); return { file: at < 0 ? first : gp.slice(0, at), ranges: (at < 0 ? gp : gp.slice(at + 1)).split(',').map((r) => r.split('-').map(Number)) }; });
+      let html = '';
+      groups.forEach((gp, k) => {
+        const lines = srcs[gp.file] || [];
+        if (groups.length > 1 || k) html += `<span class="fh">${esc(gp.file)}</span>\n`;
+        gp.ranges.forEach(([a, b], i) => {
+          if (i) html += '<span class="gap">⋮</span>\n';
+          for (let n = a; n <= (b || a); n++) html += `<span class="ln">${n}</span>${esc(lines[n - 1])}\n`;
+        });
+      });
+      d.querySelector('pre').innerHTML = html.replace(/\n$/, '');
+      d.querySelector('.cf').textContent = groups.map((gp) => `${gp.file}, l.${gp.ranges.map((r) => r.join('-')).join(' et ')}`).join(' ; ');
+    });
+  })();
+
+  /* ---------- Démarrage ---------- */
+  if (D) {
+    runChecks();
+    $('#presets').innerHTML = NAMES.map((n) => `<button data-n="${n}">${n}</button>`).join('');
+    $('#presets').addEventListener('click', (e) => { const b = e.target.closest('button'); if (b) setConfig(D.named[b.dataset.n].config); });
+    renderKern(); renderCases(); renderNamed(); renderS4Static(); renderS5Presets(); renderS6Cmp(); renderNoise(); renderS7(); renderPred();
+    setConfig(D.named.s03_equivalent.config);
+  }
+})();
+</script>
+</body>
+</html>

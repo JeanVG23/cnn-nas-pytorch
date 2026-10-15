@@ -40,7 +40,12 @@ from common.data import (  # noqa: E402
 )
 from common.device import get_device, set_seed  # noqa: E402
 from common.train import evaluate, fit  # noqa: E402
-from steps.s03_cnn_cifar import CHECKPOINT, CifarCNN, load_checkpoint, trace_shapes  # noqa: E402
+from steps.s03_cnn_cifar import (  # noqa: E402
+    CHECKPOINT,
+    CifarCNN,
+    load_checkpoint,
+    trace_shapes,
+)
 
 CPU = torch.device("cpu")
 OUT_DIR = ROOT / "explications" / "s03-cnn-cifar" / "donnees"
@@ -144,7 +149,7 @@ mean_t, std_t = torch.tensor(CIFAR_MEAN).view(3, 1, 1), torch.tensor(CIFAR_STD).
 batch = []
 for label in range(10):
     arr = torch.tensor(list(raw[picked[label]][0].getdata()), dtype=torch.float32).view(32, 32, 3).permute(2, 0, 1)  # (3, 32, 32)
-    batch.append(((arr / 255 - mean_t) / std_t))
+    batch.append((arr / 255 - mean_t) / std_t)
     images.append({"label": label, "valIndex": picked[label], "pixels": [int(v) for v in arr.reshape(-1).tolist()]})
 xb = torch.stack(batch)  # (10, 3, 32, 32)
 with torch.no_grad():
