@@ -1,0 +1,1398 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="modules" content="progression,code-relie,exemple-resolu,predictions,explique,transfert">
+<title>Palier 5 : coût d'un modèle</title>
+<style>
+:root {
+  --bg: #f7f7f4;
+  --surface: #ffffff;
+  --surface2: #efefe9;
+  --text: #1d1f23;
+  --muted: #5d6470;
+  --line: #d9d9d0;
+  --accent: #d9480f;
+  --pos: #ff922b;
+  --on-strong: #14161a;
+  --hl: #7048e8;
+  --ok: #2b8a3e;
+  --bad: #c92a2a;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #14161a;
+    --surface: #1d2026;
+    --surface2: #262a32;
+    --text: #eceae4;
+    --muted: #a0a6b0;
+    --line: #353a44;
+    --accent: #ff922b;
+    --hl: #9775fa;
+    --ok: #69db7c;
+    --bad: #ff8787;
+  }
+}
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; scroll-padding-top: 64px; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font: 16px/1.7 system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+.wrap { max-width: 980px; margin: 0 auto; padding: 0 16px; }
+
+/* En-tête et navigation */
+header.hero { padding: 40px 0 16px; }
+header.hero h1 { font-size: clamp(1.7rem, 5vw, 2.5rem); line-height: 1.2; margin: 0 0 12px; }
+.lead { font-size: 1.1rem; color: var(--muted); max-width: 68ch; margin: 0; }
+nav.top {
+  position: sticky; top: 0; z-index: 10;
+  background: color-mix(in srgb, var(--bg) 92%, transparent);
+  backdrop-filter: blur(6px);
+  border-bottom: 1px solid var(--line);
+}
+nav.top .wrap { display: flex; gap: 4px 14px; flex-wrap: wrap; padding-top: 10px; padding-bottom: 10px; }
+nav.top a { color: var(--muted); text-decoration: none; font-size: .9rem; font-weight: 600; }
+nav.top a:hover { color: var(--accent); }
+
+/* Sections */
+section { padding: 52px 0 12px; }
+section h2 { font-size: 1.5rem; margin: 0 0 18px; }
+section h2 .n {
+  display: inline-grid; place-items: center; width: 1.7em; height: 1.7em;
+  border-radius: 50%; background: var(--accent); color: #fff; font-size: .8em; margin-right: 8px;
+}
+@media (prefers-color-scheme: dark) { section h2 .n { color: #14161a; } }
+p { margin: 0 0 18px; max-width: 70ch; }
+ul, ol { max-width: 70ch; padding-left: 1.4em; margin: 0 0 18px; }
+li { margin: 8px 0; }
+/* Gras = ce qu'il faut retenir : surligné au marqueur, 1 à 3 groupes de mots courts par paragraphe, jamais une phrase entière */
+p b, li b, p strong, li strong { font-weight: 700; background: linear-gradient(transparent 60%, color-mix(in srgb, var(--pos) 32%, transparent) 60%); }
+.q .qt b, .tip b, .warn b { background: none; }
+a { color: var(--hl); }
+.muted { color: var(--muted); }
+.card {
+  background: var(--surface); border: 1px solid var(--line);
+  border-radius: 12px; padding: 18px; margin: 24px 0;
+}
+.card h3, .card h4 { margin: 0 0 6px; }
+.card h3 { font-size: 1.05rem; }
+code, .mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .92em; }
+.tip {
+  border-left: 4px solid var(--hl); background: var(--surface2);
+  padding: 12px 16px; border-radius: 0 8px 8px 0; margin: 24px 0; max-width: 70ch;
+}
+.warn {
+  border-left: 4px solid var(--bad); background: var(--surface2);
+  padding: 12px 16px; border-radius: 0 8px 8px 0; margin: 24px 0; max-width: 70ch;
+}
+
+/* Boutons et champs */
+.row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 14px 0; }
+button {
+  font: inherit; font-size: .9rem; cursor: pointer;
+  background: var(--surface); color: var(--text);
+  border: 1px solid var(--line); border-radius: 8px; padding: 6px 12px;
+}
+button:hover { border-color: var(--accent); }
+button.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+@media (prefers-color-scheme: dark) { button.on { color: #14161a; } }
+input[type="text"], input[type="number"] {
+  font: 600 15px ui-monospace, Menlo, monospace; padding: 6px 10px; min-width: 0;
+  background: var(--surface); color: var(--text); border: 1px solid var(--line); border-radius: 8px;
+}
+input[type="text"] { width: min(100%, 30ch); }
+input[type="number"] { width: 6ch; }
+input[type="text"]:focus, input[type="number"]:focus { outline: 2px solid var(--hl); }
+input[type="range"] { accent-color: var(--accent); width: min(100%, 320px); }
+label.f { font-size: .9rem; color: var(--muted); }
+
+.chars { display: flex; flex-wrap: wrap; gap: 4px; margin: 8px 0; }
+.pairs { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0; }
+.pair { font: 600 13px ui-monospace, Menlo, monospace; padding: 4px 9px; }
+.pair.cur { border-color: var(--hl); outline: 2px solid var(--hl); }
+.pick { font: 600 14px ui-monospace, Menlo, monospace; min-width: 2.4em; }
+
+.resume li { margin: 10px 0; }
+
+/* Module progression */
+nav.top a.done::before { content: "✓ "; color: var(--ok); }
+nav.top .pos { margin-left: auto; font-size: .8rem; font-weight: 600; color: var(--muted); white-space: nowrap; }
+nav.top a.cur { color: var(--accent); }
+@media (max-width: 700px) { nav.top .pos { display: none; } }
+nav.top .progress { height: 3px; background: var(--line); }
+nav.top .progress span { display: block; height: 100%; width: 0; background: var(--accent); transition: width .25s; }
+
+/* Extraits du vrai code, lus dans le fichier du projet via donnees/*.js (source.lines) */
+.codeblock { margin: 12px 0; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); }
+.codeblock summary { cursor: pointer; padding: 8px 12px; font-weight: 600; }
+.codeblock summary .muted { font-weight: 400; }
+.codeblock pre { margin: 0; padding: 8px 12px; background: var(--surface2); border-top: 1px solid var(--line); font: 13px/1.6 ui-monospace, Menlo, monospace; overflow-x: auto; white-space: pre; }
+.codeblock .ln { display: inline-block; width: 3.2ch; margin-right: 1.2ch; color: var(--muted); text-align: right; user-select: none; }
+.codeblock .gap { color: var(--muted); padding-left: 4.4ch; }
+.codeblock .map { margin: 0; padding: 8px 12px; border-top: 1px solid var(--line); font-size: .92rem; }
+/* Module exemple-resolu */
+.worked { border: 1px solid var(--line); border-radius: 12px; background: var(--surface); padding: 18px; margin: 24px 0; }
+.worked h3 { margin: 0 0 6px; }
+.wcase { border-top: 1px dashed var(--line); padding-top: 14px; margin-top: 16px; }
+.wcase.wait { opacity: .4; pointer-events: none; }
+.wcase .wtag { font-size: .75rem; font-weight: 700; letter-spacing: .03em; text-transform: uppercase; color: var(--muted); margin: 0 0 6px; }
+.wcase ol { max-width: 70ch; }
+.wcase li { margin: 12px 0; }
+.wcase .wval { font: 600 .95em ui-monospace, Menlo, monospace; background: var(--surface2); padding: 1px 8px; border-radius: 5px; }
+.wcase .why { display: block; font-size: .88rem; color: var(--muted); margin-top: 3px; }
+.wcase input[type="text"] { width: 12ch; }
+.wcase .fb.ok { color: var(--ok); font-weight: 700; }
+.wcase .fb.ko { color: var(--bad); font-weight: 700; }
+
+.predict { border: 2px solid var(--hl); border-radius: 10px; background: var(--surface); padding: 14px 16px; margin: 22px 0; }
+.predict h4 { margin: 0 0 6px; }
+.predict > p { max-width: 74ch; }
+.predict .tip { margin-bottom: 0; }
+.locked { opacity: .35; filter: grayscale(.5); pointer-events: none; }
+.predict h4 b { background: none; }
+
+.porte-q { margin: 14px 0; }
+.porte-q textarea { width: 100%; min-height: 96px; font: inherit; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); color: var(--text); resize: vertical; }
+.porte-q .pts { margin-top: 8px; }
+.porte-q .pts label { display: flex; gap: 8px; align-items: flex-start; margin: 6px 0; cursor: pointer; }
+.porte-q .pts input { margin-top: 5px; accent-color: var(--accent); flex: 0 0 auto; }
+/* Module transfert */
+.q.transfer { border-color: var(--hl); }
+.q.transfer .setup { margin: 8px 0 12px; max-width: 70ch; }
+.q.transfer details.hintbox { margin: 8px 0; }
+.q.transfer details.hintbox summary { cursor: pointer; color: var(--muted); font-size: .9rem; }
+.q.transfer .why { margin-top: 8px; }
+
+
+
+/* Tables de nombres */
+.tblwrap { overflow-x: auto; padding-bottom: 6px; }
+table.mt { border-collapse: separate; border-spacing: 2px; font: 600 12px ui-monospace, Menlo, monospace; }
+table.mt th { color: var(--muted); font-weight: 700; padding: 2px 6px; min-width: 36px; }
+table.mt th.corner { font-size: 10px; font-weight: 600; text-align: right; }
+table.mt td {
+  min-width: 36px; height: 30px; text-align: center;
+  border: 1px solid var(--line); border-radius: 4px;
+}
+table.mt td.zero { color: var(--muted); }
+table.mt td.hot { color: var(--on-strong); }
+table.mt tr.dim td { opacity: .45; }
+
+table.pt { border-collapse: collapse; font-size: .9rem; width: 100%; }
+table.pt th, table.pt td { padding: 5px 8px; border-bottom: 1px solid var(--line); text-align: left; white-space: nowrap; }
+table.pt th { color: var(--muted); font-size: .8rem; }
+table.pt td.num { font-family: ui-monospace, Menlo, monospace; text-align: right; }
+.up { color: var(--ok); font-weight: 700; }
+.down { color: var(--bad); font-weight: 700; }
+.two { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 14px; }
+.two h4 { font-size: .95rem; }
+
+/* Curseurs de scores */
+.sl { display: grid; grid-template-columns: 40px 1fr 56px; gap: 10px; align-items: center; margin: 4px 0; }
+.sl input[type="range"] { width: 100%; }
+.sl output { font: 600 13px ui-monospace, Menlo, monospace; text-align: right; }
+
+/* Barres */
+.bar-row { display: grid; grid-template-columns: 56px 1fr 230px; gap: 10px; align-items: center; margin: 5px 0; font-size: .92rem; }
+.bar { height: 18px; background: var(--surface2); border-radius: 9px; overflow: hidden; border: 1px solid var(--line); }
+.bar span { display: block; height: 100%; background: var(--accent); transition: width .15s; }
+.ch {
+  display: inline-block; min-width: 1.7em; text-align: center; padding: 0 5px;
+  font: 600 .95em ui-monospace, Menlo, monospace;
+  background: var(--surface2); border: 1px solid var(--line); border-radius: 5px;
+}
+.formula { font: 13px/1.7 ui-monospace, Menlo, monospace; background: var(--surface2); border-radius: 8px; padding: 8px 12px; margin: 6px 0; overflow-x: auto; }
+.verdict { font-size: 1.05rem; font-weight: 700; margin-top: 8px; }
+.bad { color: var(--bad); }
+.stats { display: flex; flex-wrap: wrap; gap: 10px 26px; margin: 8px 0; }
+.stat b { display: block; font: 700 1.25rem ui-monospace, Menlo, monospace; }
+.stat span { font-size: .8rem; color: var(--muted); }
+canvas#curve { width: 100%; max-width: 640px; height: auto; display: block; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); }
+
+/* Quiz */
+.quiz-head { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; justify-content: space-between; margin-bottom: 4px; }
+.quiz-head .score { font-weight: 700; }
+.q { border: 1px solid var(--line); border-radius: 10px; padding: 16px; margin: 22px 0; background: var(--surface); }
+.q .qt { font-weight: 700; margin: 0 0 4px; max-width: none; }
+.q .hint { font-size: .85rem; color: var(--muted); margin: 0 0 8px; }
+.q .tag { display: inline-block; font-size: .7rem; font-weight: 700; letter-spacing: .03em; text-transform: uppercase; padding: 2px 8px; border-radius: 99px; background: var(--surface2); color: var(--muted); margin-right: 6px; vertical-align: 2px; }
+.q .tag.trap { background: var(--bad); color: #fff; }
+.q .tag.multi { background: var(--hl); color: #fff; }
+.q .tag.fausse { background: var(--bad); color: #fff; }
+.q.mini { border-style: dashed; margin: 28px 0 8px; max-width: 70ch; }
+.q .sure { display: inline-flex; align-items: center; gap: 6px; margin-right: auto; cursor: pointer; }
+.q .sure input { accent-color: var(--hl); }
+/* Glossaire : terme défini au survol, au toucher ou au clavier (tabindex), sans dépendance */
+.def { border-bottom: 1px dotted var(--muted); cursor: help; position: relative; }
+.def:hover::after, .def:focus::after { content: attr(data-def); position: absolute; left: 0; bottom: calc(100% + 6px); z-index: 20; width: max-content; max-width: min(280px, 78vw); padding: 8px 10px; font: 400 .85rem/1.45 system-ui, sans-serif; color: var(--text); background: var(--surface2); border: 1px solid var(--line); border-radius: 8px; box-shadow: 0 4px 14px rgba(0, 0, 0, .18); }
+.def:focus { outline: 2px solid var(--hl); outline-offset: 2px; }
+.prereq ul { margin: 6px 0 0; }
+@media (prefers-color-scheme: dark) { .q .tag.trap, .q .tag.multi, .q .tag.fausse { color: #14161a; } }
+.opt { display: flex; gap: 10px; align-items: flex-start; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; margin: 6px 0; cursor: pointer; }
+.opt input { margin-top: 5px; accent-color: var(--accent); flex: 0 0 auto; }
+.opt .ot { min-width: 0; }
+.opt .why { display: none; font-size: .88rem; color: var(--muted); margin-top: 4px; }
+.q.done .opt { cursor: default; }
+.q.done .opt .why { display: block; }
+.opt.good { border-color: var(--ok); background: color-mix(in srgb, var(--ok) 13%, var(--surface)); }
+.opt.wrong { border-color: var(--bad); background: color-mix(in srgb, var(--bad) 13%, var(--surface)); }
+.opt.miss { border-color: var(--ok); border-style: dashed; }
+/* Après validation, l'affirmation fausse est barrée et sa version correcte s'affiche juste en dessous : jamais de faux sans correctif */
+.q.done .opt.isfalse .st { text-decoration: line-through; text-decoration-color: var(--bad); opacity: .8; }
+.opt .fix { display: none; margin-top: 6px; padding: 6px 10px; border-left: 3px solid var(--ok); background: var(--surface2); border-radius: 0 6px 6px 0; font-size: .92rem; }
+.q.done .opt .fix { display: block; }
+.q .explain { display: none; border-left: 4px solid var(--hl); background: var(--surface2); padding: 10px 14px; border-radius: 0 8px 8px 0; margin-top: 10px; }
+.q.done .explain { display: block; }
+.q .explain p { max-width: none; margin: 0 0 8px; }
+.q .res { font-weight: 700; margin-top: 8px; }
+.q .res.ok { color: var(--ok); } .q .res.part { color: var(--accent); } .q .res.ko { color: var(--bad); }
+
+/* Accessibilité : annonce vocale, mouvement réduit, focus visible */
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } *, ::before, ::after { transition: none !important; animation: none !important; } }
+button:focus-visible, summary:focus-visible, a:focus-visible, textarea:focus-visible, input[type="range"]:focus-visible { outline: 3px solid var(--hl); outline-offset: 2px; }
+.opt:has(input:focus-visible) { outline: 3px solid var(--hl); outline-offset: 2px; }
+.flash { animation: flash 1.8s ease-out; }
+@keyframes flash { from { box-shadow: 0 0 0 5px var(--hl); } to { box-shadow: 0 0 0 5px transparent; } }
+.q .refs { margin: 8px 0 0; }
+.q .refs a { white-space: normal; }
+.q .cal { margin: 4px 0 10px; }
+/* Objectifs : liste en tête de page, cochée au fil du quiz */
+.objs { list-style: none; padding-left: 0; }
+.objs li { position: relative; padding-left: 1.7em; margin: 8px 0; }
+.objs li::before { content: "○"; position: absolute; left: 0; color: var(--muted); }
+.objs li.ok::before { content: "✓"; color: var(--ok); font-weight: 700; }
+.objs li.ko::before { content: "✗"; color: var(--bad); font-weight: 700; }
+.objbox h4 { margin: 10px 0 0; }
+
+footer { padding: 36px 0 60px; color: var(--muted); font-size: .85rem; }
+
+@media (max-width: 700px) {
+  /* Navigation sur UNE ligne défilante : sinon 6 à 8 liens occupent trois lignes collantes sur un téléphone */
+  nav.top .wrap { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; gap: 4px 18px; }
+  nav.top .wrap::-webkit-scrollbar { display: none; }
+  nav.top a { flex: 0 0 auto; white-space: nowrap; padding: 4px 0; }
+  .bar-row { grid-template-columns: 44px 1fr 120px; font-size: .8rem; }
+}
+
+/* Page palier 5 */
+.tblwrap.tall { max-height: 340px; overflow-y: auto; }
+.dual { min-width: 150px; }
+.dual .bar { height: 8px; margin: 3px 0; }
+.dual .b2 span { background: var(--hl); }
+.legend { font-size: .82rem; color: var(--muted); margin: 4px 0 8px; }
+.legend i { display: inline-block; width: 10px; height: 10px; border-radius: 3px; background: var(--accent); margin: 0 4px 0 10px; vertical-align: -1px; }
+.legend i.v { background: var(--hl); }
+table.pt tr.ign td { color: var(--muted); }
+table.pt td.ok, table.pt tr.win td.name { color: var(--ok); font-weight: 700; }
+.stg { display: grid; grid-template-columns: 5.5em repeat(3, auto) auto; gap: 6px 10px; align-items: center; margin: 6px 0; font-size: .9rem; }
+.stg select { font: 600 14px ui-monospace, Menlo, monospace; padding: 4px 6px; background: var(--surface); color: var(--text); border: 1px solid var(--line); border-radius: 8px; }
+.stg label { display: inline-flex; gap: 6px; align-items: center; color: var(--muted); }
+.stg label.pl { cursor: pointer; }
+.stg input { accent-color: var(--accent); }
+.chk { margin-top: 8px; font-size: .9rem; color: var(--muted); }
+.chk .okc { color: var(--ok); font-weight: 700; }
+/* Simulation GPU asynchrone */
+.lanes { margin: 12px 0 4px; }
+.lane { position: relative; height: 26px; background: var(--surface2); border: 1px solid var(--line); border-radius: 6px; margin: 4px 0 2px; overflow: hidden; }
+.lane .seg { position: absolute; top: 3px; bottom: 3px; border-radius: 3px; background: var(--accent); border-right: 1px solid var(--surface); }
+.lane.gpu .seg { background: var(--hl); }
+.lanelab { font-size: .8rem; color: var(--muted); margin: 8px 0 0; }
+.axis { position: relative; height: 34px; margin-top: 2px; }
+.axis .mk { position: absolute; top: 0; bottom: 0; border-left: 2px dashed var(--bad); padding-left: 4px; font-size: .78rem; white-space: nowrap; }
+.axis .mk.g { border-left-color: var(--ok); top: 16px; }
+.axis .mk.r { transform: translateX(-100%); border-left: 0; border-right: 2px dashed var(--bad); padding: 0 4px 0 0; }
+.axis .mk.g.r { border-right-color: var(--ok); }
+svg.plot { width: 100%; max-width: 680px; height: auto; display: block; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; }
+svg.plot text { font: 11px system-ui, sans-serif; fill: var(--muted); }
+svg.plot .lab { fill: var(--text); font-weight: 600; }
+.hm { border-collapse: separate; border-spacing: 3px; font-size: .88rem; }
+.hm th { color: var(--muted); font-weight: 600; font-size: .8rem; padding: 2px 6px; text-align: center; }
+.hm th.rl { text-align: right; white-space: nowrap; }
+.hm button { width: 100%; min-width: 74px; font: 700 13px ui-monospace, Menlo, monospace; padding: 8px 6px; color: var(--text); }
+.hm button.hot { color: var(--on-strong); }
+.hm button.sel { outline: 3px solid var(--hl); border-color: var(--hl); }
+.pairs2 li { margin: 4px 0; font-size: .92rem; }
+.tag2 { display: inline-block; font-size: .7rem; font-weight: 700; padding: 1px 8px; border-radius: 99px; background: var(--surface2); color: var(--muted); border: 1px solid var(--line); }
+.tag2.fr { color: var(--accent); border-color: var(--accent); }
+.bar-row.three { grid-template-columns: 78px 1fr 270px; }
+@media (max-width: 700px) {
+  .stg { grid-template-columns: 1fr 1fr; }
+  .stg b { grid-column: 1 / -1; }
+  .bar-row.three { grid-template-columns: 1fr; gap: 2px; margin: 12px 0; }
+}
+table.pt td.wrap2 { white-space: normal; min-width: 200px; }
+</style>
+</head>
+<body>
+
+<header class="hero">
+  <div class="wrap">
+    <h1>Que coûte un modèle : paramètres, FLOPs ou latence ?</h1>
+    <p class="lead">Palier 5 : tu sais construire des CNN à la demande, il faut dire ce qu'ils coûtent. Paramètres, FLOPs et latence sont trois nombres qui <b>ne racontent pas la même chose</b> : tu vas les calculer, chronométrer un GPU sans te mentir, puis voir <b>quand les FLOPs prédisent la latence</b> et quand ils échouent. Six étapes, un quiz à la fin. Prérequis : <a href="../s04-cnn-config/s04_cnn_config_explique.html">la page du palier 4</a>.</p>
+  </div>
+</header>
+
+<nav class="top">
+  <div class="wrap">
+    <a href="#s1">1. MACs</a>
+    <a href="#s2">2. Compteur</a>
+    <a href="#s3">3. late_pool</a>
+    <a href="#s4">4. Mesurer la latence</a>
+    <a href="#s5">5. CPU ou mps</a>
+    <a href="#s6">6. FLOPs, latence, frontière</a>
+    <a href="#bilan">Bilan</a>
+    <a href="#porte">Explique</a>
+    <a href="#transfert">Transfert</a>
+    <a href="#quiz">Quiz</a>
+    <a href="#resume">Résumé</a>
+  </div>
+</nav>
+
+<main class="wrap">
+
+<div id="nodata" class="warn" hidden><b>Fichier de données introuvable.</b> Lance <code>uv run python explications/s05-cost/scripts/exporter_s05.py</code> depuis la racine du projet : la page a besoin de <code>donnees/s05.js</code> (latences, précisions, contrôles PyTorch). Les sections 1 à 4 et le quiz restent utilisables.</div>
+
+<details class="card prov"><summary>D'où viennent les chiffres : réel, du rapport, jouet</summary>
+  <p><b>Réel (PyTorch, via le script d'export) :</b> paramètres, MACs et FLOPs des 6 configs de <code>GRID</code>, de variantes de <code>s03</code> (sans BatchNorm, sans ReLU, avec biais) et de <code>s03</code> sur images 64 × 64.</p>
+  <p><b>Du rapport :</b> précisions (moyenne de 3 graines, validation sur 5 000 images) et latences (médiane de 3 runs), lues dans <code>experiments/results/s05.jsonl</code> ; les 6 lignes d'exploration ne sont pas reprises. <b>Recalculé dans la page :</b> couches et MACs de <i>ta</i> config (contrôlés contre PyTorch pour les 6 préréglages), corrélations de rang et dominances (contrôlées contre Python).</p>
+  <p><b>Jouet :</b> la simulation du GPU asynchrone et la série de passes bruitée (section 4), la droite à deux points (section 5). Aucun entraînement ni aucune latence n'est relancé ; le jeu test n'est pas repris.</p>
+</details>
+
+<div class="card" id="objectifs">
+  <h3>À la fin de cette page, tu sauras</h3>
+  <ul class="objs">
+    <li data-obj="o1" data-ref="#s1"><b>Calculer</b> les paramètres, les MACs et les FLOPs d'une convolution.</li>
+    <li data-obj="o2" data-ref="#s2">Dire <b>ce que FlopCounterMode compte</b> et ce qu'il ignore.</li>
+    <li data-obj="o3" data-ref="#s3">Expliquer pourquoi retarder un pooling <b>multiplie les FLOPs</b> sans changer les paramètres.</li>
+    <li data-obj="o4" data-ref="#s4">Expliquer pourquoi <b>synchronize, le warm-up et la médiane</b> rendent une latence fiable sur mps, et ce qu'ils ne corrigent pas.</li>
+    <li data-obj="o5" data-ref="#s5"><b>Prédire</b> quel device gagne selon le batch, et dire ce qui n'est pas prouvé.</li>
+    <li data-obj="o6" data-ref="#s6"><b>Repérer</b> quand le classement par FLOPs ne prédit plus la latence, et choisir l'objectif de coût d'un NAS d'après la frontière.</li>
+  </ul>
+</div>
+
+<div class="card prereq" id="prereq">
+  <h3>Ce que tu dois déjà savoir</h3>
+  <ul>
+    <li><b>Paramètres d'une convolution</b> : c_out · c_in · k · k poids, sans biais ici (<a href="../s04-cnn-config/s04_cnn_config_explique.html#s3">palier 4, section 3</a>).</li>
+    <li><b>Config en dict</b> : <code>stage(channels, kernel, blocks, pool)</code> et <code>build_model</code> fabriquent le réseau ; la grille <code>GRID</code> du palier 5 les réutilise (<a href="../s04-cnn-config/s04_cnn_config_explique.html#s1">palier 4, section 1</a>).</li>
+    <li><b>Une graine = une exploration</b> : une précision de validation sur 5 000 images porte une incertitude de tirage (<a href="../s04-cnn-config/s04_cnn_config_explique.html#s7">palier 4, section 7</a>).</li>
+  </ul>
+</div>
+
+<div class="card" id="common">
+  <h3>Ta config</h3>
+  <p class="muted">C'est le <b>réseau que les sections 1 à 3 lisent</b>. Choisis un préréglage (les 6 configs de <code>GRID</code>) ou règle les étages : chaque ligne est un <code>stage(channels, kernel, blocks, pool)</code>. Les images font 32 × 32, la tête est <code>AdaptiveAvgPool2d</code>, <code>Flatten</code>, <code>Linear(canaux, 10)</code>.</p>
+  <div class="row" id="presets"></div>
+  <div id="stagesEd"></div>
+  <div class="row"><button id="addStage">+ étage</button><button id="rmStage">- étage</button></div>
+  <div class="stats" id="cfgStats"></div>
+  <div class="chk" id="cfgCheck"></div>
+</div>
+
+<!-- 1 --------------------------------------------------------------- -->
+<section id="s1">
+  <h2><span class="n">1</span>Les MACs d'une convolution : les paramètres, comptés à chaque position</h2>
+  <p>Une convolution est un <b>tampon encreur</b> : le noyau (c_out · c_in · k · k poids) est pressé à chaque position de la carte. La taille du tampon, ce sont les <b>paramètres</b> ; le nombre d'empreintes, ce sont les positions (H · W) ; le travail total est le produit des deux.</p>
+  <p>Une <span class="def" tabindex="0" data-def="Multiplication-accumulation : une multiplication suivie d'une addition. C'est l'unité de travail d'une convolution ou d'un produit matriciel.">MAC</span> est une multiplication suivie d'une addition. Pour une convolution sans biais, <b>MACs = paramètres × positions</b>, et <b>1 MAC = 2 <span class="def" tabindex="0" data-def="Opérations en virgule flottante : chaque addition ou multiplication de nombres décimaux compte pour une.">FLOPs</span></b> (convention du palier : <code>macs_b1 = flops_b1 // 2</code>).</p>
+  <p><b>À toi :</b> prends <code>s03</code> dans « Ta config ». Compare la première convolution (864 paramètres) à la dernière (73 728 paramètres) : qui pèse le plus de MACs, et dans quel rapport ? Puis décoche le pooling de l'étage 1 et regarde quelles lignes explosent.</p>
+  <div class="card">
+    <div class="legend"><i></i>part des MACs de la config<i class="v"></i>part des paramètres de la config</div>
+    <div class="tblwrap tall" id="s1tbl"></div>
+    <div class="chk" id="s1note"></div>
+  </div>
+  <div class="tip">
+    <b>À retenir :</b> MACs = paramètres × positions, et FLOPs = 2 × MACs. Dans <code>s03</code>, les étages 2 et 3 pèsent autant (4 718 592 MACs) : canaux × 2 donne paramètres × 4, mais le pooling divise les positions par 4.
+  </div>
+  <details class="codeblock" data-code="steps/s05_cost.py@39-50;steps/s04_cnn_config.py@65-81"><summary>Dans le code : <code>count_params</code>, <code>count_flops</code> et <code>conv_stage</code> <span class="muted">(<span class="cf"></span>)</span></summary><pre></pre><p class="map">Lignes 39-40 de <code>s05_cost.py</code> : <code>count_params</code> somme les <code>numel()</code>, donc les poids <b>et</b> les paramètres de BatchNorm. Lignes 43-50 : <code>count_flops</code> passe une image aléatoire dans <code>FlopCounterMode</code> en mode eval et renvoie le total en FLOPs. Lignes 65-81 de <code>s04_cnn_config.py</code> : la convolution a <code>bias=False</code> et <code>padding=k // 2</code>, donc elle <b>garde la taille de la carte</b>. La page refait ces calculs à la main et se contrôle contre PyTorch.</p></details>
+</section>
+
+<!-- 2 --------------------------------------------------------------- -->
+<section id="s2">
+  <h2><span class="n">2</span>Ce que compte FlopCounterMode : les produits, rien d'autre</h2>
+  <p>Le compteur de PyTorch est une <b>caisse enregistreuse</b> qui ne scanne que deux sortes d'articles : les produits matriciels (la couche <code>Linear</code>) et les convolutions. Tout le reste passe sans être compté : <span class="def" tabindex="0" data-def="Couche qui recentre et remet à l'échelle chaque canal ; elle a 2 paramètres par canal et stabilise l'entraînement.">BatchNorm</span>, ReLU, pooling, et même les biais.</p>
+  <p>Le compteur donne donc un <b>minimum</b> : le travail de multiplication, pas le travail de mémoire (lire et écrire chaque carte d'activation). Garde cette absence en tête : elle resservira à la section 6.</p>
+  <p><b>À toi :</b> prédis d'abord, puis active ou désactive BatchNorm, ReLU et biais. Quel nombre bouge (paramètres, éléments traités) et lequel reste figé (FLOPs comptés) ?</p>
+  <div class="card" id="s2c">
+    <div class="row">
+      <label class="f"><input type="checkbox" id="s2bn" checked> BatchNorm</label>
+      <label class="f"><input type="checkbox" id="s2relu" checked> ReLU</label>
+      <label class="f"><input type="checkbox" id="s2bias"> biais des convolutions</label>
+    </div>
+    <div class="stats" id="s2stats"></div>
+    <div class="tblwrap tall" id="s2tbl"></div>
+    <div class="chk" id="s2note"></div>
+  </div>
+  <div class="tip">
+    <b>À retenir :</b> <code>FlopCounterMode</code> ne compte que les convolutions et les <code>Linear</code> : ni BatchNorm, ni ReLU, ni pooling, ni biais. C'est un minimum de calcul, pas de la mémoire.
+  </div>
+  <details class="codeblock" data-code="steps/s05_cost.py@43-50;tests/test_s05_cost.py@29-32"><summary>Dans le code : <code>count_flops</code> et son test <span class="muted">(<span class="cf"></span>)</span></summary><pre></pre><p class="map">Lignes 48-49 de <code>s05_cost.py</code> : <code>FlopCounterMode</code> enveloppe <b>un seul appel</b> du modèle, sans gradient. Lignes 29-32 du test : une convolution suivie de <code>ReLU</code> et <code>MaxPool2d</code> donne <b>le même total</b> que la convolution seule, propriété que la zone ci-dessus fait manipuler. Le script d'export vérifie que BatchNorm, ReLU et biais ne changent pas le compte, sur une variante de <code>s03</code>.</p></details>
+</section>
+
+<!-- 3 --------------------------------------------------------------- -->
+<section id="s3">
+  <h2><span class="n">3</span>Mêmes paramètres, plus de FLOPs : le cas late_pool</h2>
+  <p>Retarde un pooling et rien ne change dans les <b>poids</b>, tout change dans les <b>positions</b>. <code>late_pool</code> reprend <code>s03</code> mais retire le pooling de l'étage 2 : l'étage 3 travaille sur des cartes de 16 × 16 au lieu de 8 × 8, soit <b>4 fois plus de positions</b> pour les mêmes poids.</p>
+  <p>Mesure de PyTorch : 94 762 paramètres dans les deux cas, mais 24,5 M de MACs contre 10,3 M (<b>× 2,37</b>). Et la précision n'a pas suivi : <b>64,43 %</b> contre <b>67,69 %</b> pour <code>s03</code> (moyenne de 3 graines, 4 époques).</p>
+  <p><b>À toi :</b> choisis <code>s03</code>, puis clique « Étage 2 » pour retirer son pooling. Compare à la colonne <code>s03</code>. Essaie ensuite de retirer le pooling d'un autre étage : qui coûte le plus ?</p>
+  <div class="card">
+    <div class="row" id="s3btns"></div>
+    <div class="tblwrap" id="s3tbl"></div>
+    <div id="s3stages"></div>
+    <div class="chk" id="s3acc"></div>
+  </div>
+  <div class="tip">
+    <b>À retenir :</b> les paramètres mesurent la taille des poids, les MACs le calcul. L'écart de 3,3 points dépasse le bruit entre graines (0,2 point), mais que les FLOPs en soient la cause reste une hypothèse.
+  </div>
+  <details class="codeblock" data-code="steps/s05_cost.py@26-34"><summary>Dans le code : la grille <code>GRID</code> <span class="muted">(<span class="cf"></span>)</span></summary><pre></pre><p class="map">Ligne 30 : <code>deep</code> double les blocs de chaque étage. Ligne 32 : le commentaire dit l'intention de <code>late_pool</code>, <b>plus de FLOPs sans plus de paramètres</b>. Ligne 33 : un seul changement, <code>pool=False</code> sur l'étage 2. Les cinq autres configs changent largeur, profondeur ou noyau.</p></details>
+</section>
+
+<!-- 4 --------------------------------------------------------------- -->
+<section id="s4">
+  <h2><span class="n">4</span>Mesurer une latence : synchronize, warm-up et médiane</h2>
+  <p>Sur <span class="def" tabindex="0" data-def="Backend de PyTorch qui utilise le GPU du Mac (Metal Performance Shaders), via une file de commandes envoyées au GPU.">mps</span>, Python ne calcule pas : il <b>dépose des tickets</b> (les opérations) dans la file du GPU et reprend la main aussitôt, comme un serveur qui pose une commande en cuisine. Lire l'horloge à ce moment mesure le temps de dépose, pas le temps du plat.</p>
+  <p><code>synchronize</code> est l'attente du plat : elle bloque jusqu'à la fin de tous les calculs en file. Sans elle, <code>perf_counter</code> ne voit que la <b>soumission</b>, et la <span class="def" tabindex="0" data-def="Temps écoulé entre l'entrée et la sortie du modèle pour une passe avant, ici en millisecondes.">latence</span> est sous-estimée d'autant plus que le calcul est long.</p>
+  <p><b>À toi :</b> prédis, puis règle les trois curseurs. Compare « sans synchronize » et « avec synchronize », puis clique « Calcul court » et « Calcul long » : quand l'écart disparaît-il ?</p>
+  <div class="card" id="s4c">
+    <div class="sl4">
+      <label class="f">Opérations lancées : <input type="range" id="s4n" min="2" max="40" step="1" value="20"> <b id="s4nout" style="white-space:nowrap"></b></label><br>
+      <label class="f">Soumission par opération (µs) : <input type="range" id="s4s" min="5" max="120" step="5" value="30"> <b id="s4sout" style="white-space:nowrap"></b></label><br>
+      <label class="f">Calcul GPU par opération (µs) : <input type="range" id="s4g" min="2" max="300" step="2" value="100"> <b id="s4gout" style="white-space:nowrap"></b></label>
+    </div>
+    <div class="row"><button id="s4short">Calcul court (jouet : 10 µs)</button><button id="s4long">Calcul long (jouet : 100 µs)</button><button id="s4reset">Remettre à 20 / 30 / 100</button></div>
+    <div class="lanes" id="s4lanes"></div>
+    <div class="stats" id="s4stats"></div>
+    <div class="chk" id="s4note"></div>
+  </div>
+  <p>Une fois <code>synchronize</code> en place, il reste le bruit : une seule passe chronométrée ment. Les <b>premières passes</b> compilent les noyaux et allouent la mémoire (le <span class="def" tabindex="0" data-def="Passes d'échauffement jetées avant de mesurer : elles paient la compilation des noyaux et l'allocation de la mémoire.">warm-up</span>), et une passe isolée peut être gênée par le système. Le code écarte 10 passes puis chronomètre 50 passes.</p>
+  <p>Il garde la <b>médiane</b>, pas la moyenne : la médiane est la valeur du milieu, une passe 5 fois trop lente ne la déplace presque pas, alors qu'elle tire la moyenne vers le haut.</p>
+  <p><b>À toi :</b> mets 0 passe de warm-up et lis l'écart de la médiane et de la moyenne au vrai temps. Active les perturbations. Puis clique « Protocole du code » (10 + 50) : les deux écarts se resserrent-ils ?</p>
+  <div class="card">
+    <div class="sl4">
+      <label class="f">Vrai temps d'une passe (ms) : <input type="range" id="s5t" min="0.2" max="3" step="0.1" value="1"> <b id="s5tout" style="white-space:nowrap"></b></label><br>
+      <label class="f">Passes de warm-up écartées : <input type="range" id="s5w" min="0" max="12" step="1" value="0"> <b id="s5wout" style="white-space:nowrap"></b></label><br>
+      <label class="f">Passes chronométrées : <input type="range" id="s5r" min="5" max="100" step="5" value="50"> <b id="s5rout" style="white-space:nowrap"></b></label>
+    </div>
+    <div class="row"><label class="f"><input type="checkbox" id="s5sp"> perturbations (4 passes gênées par le système)</label><button id="s5proto">Protocole du code (10 + 50)</button><button id="s5zero">Aucune précaution (0 + 50)</button></div>
+    <div id="s5plot"></div>
+    <div class="stats" id="s5stats"></div>
+    <div class="chk" id="s5note"></div>
+  </div>
+  <div class="tip">
+    <b>À retenir :</b> <code>synchronize</code> transforme « temps de soumission » en « temps de calcul » ; warm-up et médiane écartent démarrage et pics. Une médiane reste pourtant <b>une</b> mesure : d'un run à l'autre, une même latence varie jusqu'à <b><span class="spreadtop">48 %</span></b>.
+  </div>
+  <details class="codeblock" data-code="steps/s05_cost.py@53-67;common/device.py@22-25"><summary>Dans le code : <code>measure_latency</code> et <code>synchronize</code> <span class="muted">(<span class="cf"></span>)</span></summary><pre></pre><p class="map">Lignes 59-60 de <code>s05_cost.py</code> : <b>10 passes d'échauffement</b>, jetées. Ligne 61 : <code>synchronize</code> avant le chronomètre. Lignes 62-66 : <b>50 passes</b>, chacune entourée de <code>perf_counter</code> et de <code>synchronize</code> (ligne 65 : « sans cela, sur mps, on ne mesure que la soumission »). Ligne 67 : <code>statistics.median</code>. Lignes 22-25 de <code>device.py</code> : l'appel est fait pour tous les devices mais n'agit que sur mps. Les zones ci-dessus sont des <b>jouets</b> : le palier n'a mesuré ni la variante sans <code>synchronize</code> ni les 50 passes, seulement la médiane.</p></details>
+</section>
+
+<!-- 5 --------------------------------------------------------------- -->
+<section id="s5">
+  <h2><span class="n">5</span>CPU contre mps : le batch change le gagnant</h2>
+  <p>Le GPU est un <b>camion</b> : gros débit, mais un coût de démarrage fixe, payé même pour une seule lettre. Le CPU est un <b>vélo</b> : départ immédiat, débit limité. Pour une seule image (<span class="def" tabindex="0" data-def="Nombre d'images traitées ensemble dans une passe avant : batch 1 = une image, batch 64 = soixante-quatre.">batch</span> 1), le vélo peut gagner ; pour 64 images, le camion écrase.</p>
+  <p>Le rapport mesure les deux devices pour 6 configs et 2 batchs. Ce n'est pas un détail de matériel : la latence dépend du <b>contexte de déploiement</b>, pas seulement du modèle.</p>
+  <p><b>À toi :</b> prédis, puis bascule entre batch 1 et batch 64 et lis les rapports. Ensuite, dans « Entre les deux », choisis une config et déplace le curseur de batch : à partir de quel batch mps passe-t-il devant ?</p>
+  <div class="card" id="s6a">
+    <div class="row" id="s6b"></div>
+    <div id="s6bars"></div>
+    <div class="chk" id="s6range"></div>
+  </div>
+  <div class="card" id="s6c">
+    <h4>Entre les deux : une droite par device (jouet à deux points)</h4>
+    <p class="muted">On n'a mesuré que le batch 1 et le batch 64. La droite latence = a + pente × batch passe par ces deux points : <b>a</b> est le coût fixe, la <b>pente</b> le coût par image. C'est une extrapolation, pas une mesure.</p>
+    <div class="row" id="s6cfg"></div>
+    <div class="row"><label class="f">Batch : <input type="range" id="s6bs" min="0" max="8" step="1" value="3" style="width:min(100%,280px)"> <b id="s6bsout" style="white-space:nowrap"></b></label></div>
+    <div id="s6plot"></div>
+    <div class="stats" id="s6stats"></div>
+    <div class="chk" id="s6note"></div>
+  </div>
+  <div class="tip">
+    <b>À retenir :</b> à batch 1 le CPU bat mps pour les 6 configs, à batch 64 mps bat le CPU : une latence n'a de sens que pour <b>un matériel et un batch</b>. Le coût de soumission est l'explication plausible, jamais isolée.
+  </div>
+  <details class="codeblock" data-code="steps/s05_cost.py@70-73,110-112"><summary>Dans le code : les devices mesurés <span class="muted">(<span class="cf"></span>)</span></summary><pre></pre><p class="map">Lignes 70-73 : <code>measurement_devices</code> renvoie le device d'entraînement (mps) plus le CPU. Lignes 110-112 : pour chaque device et chaque taille de lot (<code>BATCH_SIZES = (1, 64)</code>), une latence est enregistrée : ce sont <b>les 4 colonnes</b> de la zone ci-dessus. Le code ne mesure <b>pas les batchs intermédiaires</b> : la droite est une construction de la page.</p></details>
+</section>
+
+<!-- 6 --------------------------------------------------------------- -->
+<section id="s6">
+  <h2><span class="n">6</span>Les FLOPs prédisent-ils la latence, et quel coût optimiser ?</h2>
+  <p>Pour choisir entre deux modèles, ce qui compte est souvent leur <b>ordre</b> : lequel est le plus rapide ? Le <span class="def" tabindex="0" data-def="Mesure de 1 à -1 de l'accord entre deux classements : 1 = même ordre, 0 = aucun lien, -1 = ordre inversé.">coefficient de Spearman</span> ρ dit à quel point deux classements concordent : <b>1</b> pour le même ordre, <b>0</b> pour aucun lien, <b>−1</b> pour un ordre inversé.</p>
+  <p>On compte aussi les <b>paires inversées</b> : A a moins de MACs que B, mais A est plus lente. Sur 6 configs il y a 15 paires, et les inversions disent <i>où</i> le classement se trompe.</p>
+  <p><b>À toi :</b> prédis, puis clique sur les cases de la carte de ρ (une case par métrique, device et batch). Trouve la pire case, puis lis ses paires inversées : sont-elles entre configs proches ou lointaines ?</p>
+  <div class="card" id="s7c">
+    <div class="tblwrap" id="s7hm"></div>
+    <div class="stats" id="s7stats"></div>
+    <div class="tblwrap" id="s7tbl"></div>
+    <ul class="pairs2" id="s7inv"></ul>
+    <div class="chk" id="s7chk"></div>
+  </div>
+  <p>Reste à <b>choisir</b>. Un NAS cherche le modèle le plus précis pour un coût donné. Une config est <span class="def" tabindex="0" data-def="Dominée : une autre config est au moins aussi bonne sur le coût et sur la précision, et strictement meilleure sur l'un des deux.">dominée</span> si une autre est au moins aussi bonne sur le coût et la précision, et meilleure sur l'un des deux ; les configs non dominées forment la <b>frontière</b> (front de Pareto, le palier 6 reporté). Mais « moins cher » dépend de la règle : change de règle, et la frontière peut changer. Une domination est <b>fragile</b> si l'écart de précision est sous 2 écarts-types de tirage (environ 1,8 point sur 5 000 images).</p>
+  <p><b>À toi :</b> choisis un axe de coût et regarde qui est dominé. Compare « MACs » et « mps batch 1 » : quelle config entre sur la frontière, quelle config en sort ?</p>
+  <div class="card">
+    <div class="row" id="s8b"></div>
+    <div id="s8plot"></div>
+    <div class="chk" id="s8list"></div>
+  </div>
+  <div class="tip">
+    <b>À retenir :</b> les MACs classent bien la latence à batch 64 (ρ = 1,00 mps, 0,89 CPU), moins bien à batch 1 (0,60 et 0,66), et la frontière dépend du coût choisi. Pour un NAS : optimiser la <b>latence mesurée sur la cible</b>.
+  </div>
+  <details class="codeblock" data-code="steps/s05_cost.py@96-113,118-122"><summary>Dans le code : la ligne enregistrée et le tableau final <span class="muted">(<span class="cf"></span>)</span></summary><pre></pre><p class="map">Lignes 96-107 : une ligne par config (<code>n_params</code>, <code>flops_b1</code>, <code>val_acc</code>) ; lignes 110-112 : les 4 latences, colonnes que la carte de ρ compare ; lignes 108-109 : <code>test_acc</code> n'est lu qu'avec <code>--test</code>, la page ne le reprend pas. Ligne 113 : <code>append_result</code> écrit dans <code>experiments/results/s05.jsonl</code>, relu par le script d'export (3 graines agrégées) : c'est <b>l'entrée du palier 6</b>. Lignes 118-122 : tableau imprimé trié par paramètres. Spearman et dominance : calculés par la page, contrôlés par le script d'export.</p></details>
+</section>
+
+<!-- Bilan ----------------------------------------------------------- -->
+<section id="bilan">
+  <h2><span class="n">7</span>Bilan</h2>
+  <div class="card"><h3>Ce que ça ne prouve pas</h3>
+    <ul>
+      <li>Que la cause soit <b>le coût de soumission</b> de Python vers Metal : il n'est jamais isolé.</li>
+      <li>Que <code>deep</code> soit plus lent que <code>wide</code> sur CPU à cause des caches : l'écart de MACs est de 2 % et la cause n'est pas mesurée.</li>
+      <li>Que ces classements tiennent sur <b>d'autres batchs ou d'autres machines</b> : 3 graines, 4 époques, une médiane par config et par device, validation seulement ; d'un run à l'autre, la même latence varie jusqu'à <span class="spreadtop">48 %</span>.</li>
+      <li>Que <code>late_pool</code> soit moins précis <i>à cause</i> de ses FLOPs : l'écart de 3,3 points dépasse le bruit entre graines (0,2 point), mais une seule architecture est comparée.</li>
+    </ul></div>
+  <details class="card" id="ecarts"><summary>Écarts avec le rapport (pour l'auteur)</summary>
+    <div class="warn" id="s6warn"></div>
+    <div class="warn" id="s7warn"></div>
+  </details>
+  <div class="card" id="pont">
+    <h3>Où ça reviendra dans les prochaines étapes</h3>
+    <div class="tblwrap"><table class="pt">
+      <tr><th>Dans cette étape</th><th>Ce que ça devient ensuite (d'après le plan du projet)</th><th>Vu sur cette page ?</th></tr>
+      <tr><td class="wrap2">Paramètres, MACs, FLOPs d'une config</td><td class="wrap2">Palier 6 (reporté) : random search de 20 à 30 architectures tirées dans l'espace du palier 4, chacune avec ces coûts.</td><td>Oui (sections 1 à 3)</td></tr>
+      <tr><td class="wrap2">Latence mesurée (warm-up, <code>synchronize</code>, médiane)</td><td class="wrap2">Recommandation de la page, hors plan : pour un NAS ciblant un matériel, optimiser une latence mesurée avec cette méthode.</td><td>Oui (sections 4 et 5)</td></tr>
+      <tr><td class="wrap2">Lignes JSONL (config, <code>val_acc</code>, coûts, latences)</td><td class="wrap2">Entrée prévue du palier 6 ; 3 graines pour les chiffres retenus (appliqué ici), jeu test lu seulement avec <code>--test</code>.</td><td>Oui (sections 3, 5 et 6)</td></tr>
+      <tr><td class="wrap2">Dominance et frontière sur 6 configs</td><td class="wrap2">Palier 6 : front de Pareto sur les architectures tirées au hasard.</td><td>Oui (section 6)</td></tr>
+    </table></div>
+  </div>
+  <div class="tip"><b>Limites de la page, et suite.</b> Latences et précisions viennent du rapport (3 graines), pas rejouées ; la simulation asynchrone, la série bruitée et la droite à deux points sont des jouets. Suite, hors plan : batchs intermédiaires et plus de runs de latence.</div>
+</section>
+
+
+<section id="porte">
+  <h2><span class="n">8</span>Explique avec tes mots</h2>
+  <p class="muted">Les trois questions du rapport (section 6). Écris ta réponse <b>sans regarder la page ni le code</b>, puis révèle les points attendus et coche ceux que tu avais déjà. Ce que tu écris reste dans ce navigateur, nulle part ailleurs.</p>
+  <div class="card" id="porteBox"></div>
+</section>
+
+<section id="transfert">
+  <h2><span class="n">T</span>Transfert : une situation nouvelle</h2>
+  <p>Mêmes principes, <b>autre situation</b> : rien de ce qui suit n'a été vu tel quel dans la page. Utilise ce que tu as manipulé, et le modèle de la page pour vérifier.</p>
+  <div id="transfertBox"></div>
+</section>
+
+<section id="quiz">
+  <h2>Quiz : peux-tu expliquer le coût d'un modèle ?</h2>
+  <p class="muted">Ces questions couvrent ce qu'il faut retenir pour expliquer le palier 5 à quelqu'un d'autre. Certaines sont des pièges : chaque réponse, juste ou fausse, est expliquée après validation.</p>
+  <div class="card" id="quizBox"></div>
+</section>
+
+<section id="resume">
+  <h2><span class="n">9</span>Résumé en 10 lignes</h2>
+  <ol class="resume">
+    <li>Paramètres d'une convolution : c_out · c_in · k · k ; ils ne dépendent pas de la taille de l'image.</li>
+    <li>MACs d'une convolution = paramètres × positions (H · W) ; 1 MAC = 2 FLOPs.</li>
+    <li>Sur s03, 94 762 paramètres et 10 323 200 MACs (20 646 400 FLOPs) ; les étages 2 et 3 pèsent chacun 4 718 592 MACs.</li>
+    <li>FlopCounterMode ne compte que les convolutions et les Linear : ni BatchNorm, ni ReLU, ni pooling, ni biais.</li>
+    <li>late_pool a les mêmes 94 762 paramètres que s03 mais 24,5 M de MACs au lieu de 10,3 M (× 2,37), et 64,43 % de précision contre 67,69 % (moyenne de 3 graines).</li>
+    <li>Sur mps les opérations sont asynchrones : sans synchronize, perf_counter ne mesure que la soumission des opérations.</li>
+    <li>Protocole de latence : 10 passes de warm-up jetées, 50 passes chronométrées avec synchronize, médiane ; la même latence varie pourtant jusqu'à <span class="spreadtop">48 %</span> d'un run à l'autre.</li>
+    <li>À batch 1 le CPU bat mps pour les 6 configs (× 1,3 à × 4,8) ; à batch 64 mps bat le CPU (× 1,7 à × 6,5).</li>
+    <li>Les MACs classent la latence avec ρ = 1,00 (mps) et 0,89 (CPU) à batch 64, mais 0,60 et 0,66 à batch 1 ; sur CPU, wide est plus rapide que deep malgré 2 % de MACs en plus.</li>
+    <li>La frontière coût-précision change avec la métrique de coût (sur mps batch 1 : s03, kernel5, deep) : pour un NAS ciblant un matériel, optimiser la latence mesurée sur lui.</li>
+  </ol>
+</section>
+
+</main>
+
+<footer>
+  <div class="wrap">Page pédagogique autonome : aucun réseau, aucune dépendance, sauf <code>donnees/s05.js</code>. Les paramètres, MACs et FLOPs viennent de PyTorch via <code>scripts/exporter_s05.py</code> ; les latences (médiane de 3 runs) et précisions (moyenne de 3 graines, validation) viennent de <code>experiments/results/s05.jsonl</code> (graines 0, 1, 2, 4 époques).</div>
+</footer>
+
+<div id="sr" class="sr-only" role="status" aria-live="polite"></div>
+
+<script src="donnees/s05.js"></script>
+<script>
+(() => {
+  const $ = (s) => document.querySelector(s);
+  const esc = (s) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  const fr = (x, d) => (Object.is(+x.toFixed(d), -0) ? 0 : x).toFixed(d).replace('.', ',');  // décimale française, pas de « -0,00 »
+  const sum = (a) => a.reduce((x, y) => x + y, 0);
+  // Annonce vocale (lecteurs d'écran) : les verdicts apparaissent dans une zone masquée, sans quoi rien n'est lu.
+  const announce = (m) => { const r = $('#sr'); if (!r) return; r.textContent = ''; setTimeout(() => { r.textContent = m; }, 60); };
+  // Mémoire du navigateur : la clé inclut le chemin du fichier, donc UNE CLÉ PAR PAGE sans rien renommer. Jamais bloquant.
+  const store = {
+    get: (n, d) => { try { const v = localStorage.getItem(location.pathname + '#' + n); return v === null ? d : JSON.parse(v); } catch (e) { return d; } },
+    set: (n, v) => { try { localStorage.setItem(location.pathname + '#' + n, JSON.stringify(v)); } catch (e) { /* stockage indisponible : la page marche quand même */ } },
+  };
+  // Libellé lisible d'une ancre (titre de la section, sinon début du texte) pour les liens « À relire ».
+  const refLabel = (ref) => {
+    const el = document.querySelector(ref); if (!el) return ref;
+    if (el.matches('section')) { const h = el.querySelector('h2'), nb = h && h.querySelector('.n'); const t = h ? h.textContent.replace(nb ? nb.textContent : '', '').trim() : ref; return (nb ? nb.textContent + '. ' : '') + t; }
+    return el.textContent.trim().replace(/\s+/g, ' ').slice(0, 60);
+  };
+  const css = (name) => getComputedStyle(document.documentElement).getPropertyValue(name).trim(); // pour les canvas
+
+  /* ---------- Données du script d'export (PyTorch + rapport) ---------- */
+  const D = window.S05;
+  if (!D) { const nd = $('#nodata'); if (nd) nd.hidden = false; }
+  const fmt = (n) => Math.round(n).toLocaleString('fr-FR');
+  const pct = (a, b) => (b ? 100 * a / b : 0);
+  const mean = (a) => sum(a) / a.length;
+  const median = (a) => { const s = [...a].sort((x, y) => x - y), m = s.length >> 1; return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2; };
+  const RUNS = D ? Object.fromEntries(D.runs.map((r) => [r.config_name, r])) : {};
+  const NAMES = ['tiny', 's03', 'late_pool', 'kernel5', 'deep', 'wide'];   // par MACs croissants
+  const KEYS = [['latency_mps_b1_ms', 'mps batch 1'], ['latency_mps_b64_ms', 'mps batch 64'], ['latency_cpu_b1_ms', 'CPU batch 1'], ['latency_cpu_b64_ms', 'CPU batch 64']];
+  const VAL_N = 5000;   // images de validation (rapport, section 4)
+
+  /* ---------- Modèle : couches, paramètres, MACs d'une config (mêmes formules que PyTorch) ---------- */
+  const st = (channels, kernel = 3, blocks = 1, pool = true) => ({ channels, kernel, blocks, pool });
+  const PRESETS = {
+    tiny: [st(16), st(32)],
+    s03: [st(32), st(64), st(128)],
+    wide: [st(64), st(128), st(256)],
+    deep: [st(32, 3, 2), st(64, 3, 2), st(128, 3, 2)],
+    kernel5: [st(32, 5), st(64, 5), st(128, 5)],
+    late_pool: [st(32), st(64, 3, 1, false), st(128)],
+  };
+  const PRESET_ORDER = ['tiny', 's03', 'wide', 'deep', 'kernel5', 'late_pool'];
+  const clone = (stages) => stages.map((s) => ({ ...s }));
+  const sameAs = (stages) => PRESET_ORDER.find((n) => JSON.stringify(PRESETS[n]) === JSON.stringify(stages)) || null;
+  function build(stages, size0 = 32) {
+    let size = size0, cin = 3;
+    const layers = [];
+    stages.forEach((s, i) => {
+      for (let b = 0; b < s.blocks; b++) {
+        const params = s.channels * cin * s.kernel * s.kernel, pos = size * size, out = `${s.channels}×${size}×${size}`;
+        layers.push({ stage: i + 1, kind: 'conv', label: `Conv ${cin} → ${s.channels}, ${s.kernel}×${s.kernel}`, cin, cout: s.channels, size, pos, params, macs: params * pos, elems: s.channels * pos, out });
+        layers.push({ stage: i + 1, kind: 'bn', label: 'BatchNorm', params: 2 * s.channels, macs: 0, elems: s.channels * pos, out });
+        layers.push({ stage: i + 1, kind: 'relu', label: 'ReLU', params: 0, macs: 0, elems: s.channels * pos, out });
+        cin = s.channels;
+      }
+      if (s.pool) {
+        layers.push({ stage: i + 1, kind: 'pool', label: 'MaxPool 2×2', params: 0, macs: 0, elems: cin * size * size, out: `${cin}×${size >> 1}×${size >> 1}` });
+        size >>= 1;
+      }
+    });
+    layers.push({ stage: 0, kind: 'gap', label: 'AdaptiveAvgPool, Flatten', params: 0, macs: 0, elems: cin * size * size, out: `${cin}` });
+    layers.push({ stage: 0, kind: 'linear', label: `Linear ${cin} → 10`, params: cin * 10 + 10, macs: cin * 10, elems: 10, out: '10' });
+    const macs = sum(layers.map((l) => l.macs));
+    return { layers, params: sum(layers.map((l) => l.params)), macs, flops: 2 * macs, finalSize: size };
+  }
+  const stageMacs = (M) => { const out = []; M.layers.filter((l) => l.kind === 'conv').forEach((l) => { out[l.stage - 1] = (out[l.stage - 1] || 0) + l.macs; }); return out; };
+
+  /* ---------- État et rendu ---------- */
+  const state = { stages: clone(PRESETS.s03) };
+  const CH = [4, 8, 16, 24, 32, 48, 64, 96, 128, 192, 256, 384, 512];
+  const sel = (k, opts, val) => `<select data-k="${k}" aria-label="${k}">${opts.map((o) => `<option value="${o}"${o === val ? ' selected' : ''}>${o}</option>`).join('')}</select>`;
+  function buildRows() {
+    $('#stagesEd').innerHTML = state.stages.map((s, i) => `<div class="stg" data-i="${i}"><b>Étage ${i + 1}</b><label>canaux ${sel('channels', CH, s.channels)}</label><label>noyau ${sel('kernel', [1, 3, 5, 7], s.kernel)}</label><label>blocs ${sel('blocks', [1, 2, 3, 4], s.blocks)}</label><label class="pl"><input type="checkbox" data-k="pool"${s.pool ? ' checked' : ''}> pooling</label></div>`).join('');
+  }
+  $('#presets').innerHTML = PRESET_ORDER.map((n) => `<button data-p="${n}">${n}</button>`).join('');
+  $('#presets').addEventListener('click', (e) => { const b = e.target.closest('button[data-p]'); if (!b) return; state.stages = clone(PRESETS[b.dataset.p]); buildRows(); refresh(); });
+  $('#stagesEd').addEventListener('change', (e) => {
+    const row = e.target.closest('.stg'), k = e.target.dataset.k; if (!row || !k) return;
+    state.stages[+row.dataset.i][k] = e.target.type === 'checkbox' ? e.target.checked : +e.target.value;
+    refresh();
+  });
+  $('#addStage').addEventListener('click', () => { if (state.stages.length >= 5) return; const l = state.stages[state.stages.length - 1]; state.stages.push({ ...l, channels: Math.min(512, l.channels * 2) }); buildRows(); refresh(); });
+  $('#rmStage').addEventListener('click', () => { if (state.stages.length <= 1) return; state.stages.pop(); buildRows(); refresh(); });
+  const pluralPts = (x) => `${fr(x, 2)} point${Math.abs(x) >= 2 ? 's' : ''}`;
+  const th = (cols) => '<tr>' + cols.map((c) => `<th>${c}</th>`).join('') + '</tr>';
+
+  function refresh() {
+    const M = build(state.stages);
+    renderCommon(M); renderS1(M); renderS2(M); renderS3(M);
+  }
+  function renderCommon(M) {
+    const name = sameAs(state.stages);
+    document.querySelectorAll('#presets button').forEach((b) => b.classList.toggle('on', b.dataset.p === name));
+    $('#addStage').disabled = state.stages.length >= 5; $('#rmStage').disabled = state.stages.length <= 1;
+    $('#cfgStats').innerHTML = [['Paramètres', fmt(M.params)], ['MACs', fmt(M.macs)], ['FLOPs', fmt(M.flops)], ['Carte avant la tête', `${M.finalSize}×${M.finalSize}`]].map(([k, v]) => `<div class="stat"><b>${v}</b><span>${k}</span></div>`).join('');
+    const real = name && D && D.grid[name];
+    $('#cfgCheck').innerHTML = real
+      ? (real.params === M.params && real.flops === M.flops ? `<span class="okc">✓</span> Identique à PyTorch pour <code>${name}</code> : <code>count_params</code> ${fmt(real.params)}, <code>count_flops</code> ${fmt(real.flops)}.` : `<b class="bad">Écart avec PyTorch pour ${name} :</b> PyTorch donne ${fmt(real.params)} paramètres et ${fmt(real.flops)} FLOPs.`)
+      : 'Config libre : la page la calcule avec les mêmes formules, mais PyTorch n\'a exporté de valeur que pour les 6 préréglages.';
+  }
+
+  /* 1. MACs d'une convolution */
+  function renderS1(M) {
+    const convs = M.layers.filter((l) => l.kind === 'conv');
+    const rows = convs.map((l, i) => `<tr><td>${i + 1}</td><td>${l.label}</td><td class="num">${l.size}×${l.size} = ${fmt(l.pos)}</td><td class="num">${fmt(l.params)}</td><td class="num">${fmt(l.macs)}</td><td class="num">${fmt(2 * l.macs)}</td><td><div class="dual"><div class="bar"><span style="width:${pct(l.macs, M.macs)}%"></span></div><div class="bar b2"><span style="width:${pct(l.params, M.params)}%"></span></div></div></td></tr>`).join('');
+    const cp = sum(convs.map((l) => l.params)), cm = sum(convs.map((l) => l.macs));
+    $('#s1tbl').innerHTML = `<table class="pt">${th(['#', 'Couche', 'Positions', 'Paramètres', 'MACs', 'FLOPs', 'Parts'])}${rows}<tr><td></td><td><b>Convolutions</b></td><td></td><td class="num"><b>${fmt(cp)}</b></td><td class="num"><b>${fmt(cm)}</b></td><td class="num"><b>${fmt(2 * cm)}</b></td><td></td></tr></table>`;
+    const a = convs[0], z = convs[convs.length - 1];
+    $('#s1note').innerHTML = `Conv 1 : ${fr(pct(a.params, M.params), 1)} % des paramètres mais ${fr(pct(a.macs, M.macs), 1)} % des MACs (${fmt(a.pos)} positions). Conv ${convs.length} : ${fr(pct(z.params, M.params), 1)} % des paramètres et ${fr(pct(z.macs, M.macs), 1)} % des MACs (${fmt(z.pos)} positions). Le reste des MACs et des paramètres vient de la tête <code>Linear</code> et de BatchNorm.`;
+  }
+
+  /* 2. Ce que compte FlopCounterMode */
+  function renderS2(M) {
+    const bn = $('#s2bn').checked, relu = $('#s2relu').checked, bias = $('#s2bias').checked;
+    const layers = M.layers.filter((l) => (l.kind !== 'bn' || bn) && (l.kind !== 'relu' || relu));
+    const counted = (l) => l.kind === 'conv' || l.kind === 'linear';
+    const nb = (l) => (bias && l.kind === 'conv' ? l.cout : 0);
+    const params = sum(layers.map((l) => l.params + nb(l))), flops = 2 * sum(layers.map((l) => l.macs));
+    const untracked = sum(layers.filter((l) => !counted(l)).map((l) => l.elems));
+    $('#s2stats').innerHTML = [[fmt(flops), 'FLOPs comptés par PyTorch'], [fmt(params), 'Paramètres'], [fmt(layers.length), 'Opérations lancées (couches)'], [fmt(untracked), 'Éléments traités hors compteur']].map(([v, k]) => `<div class="stat"><b>${v}</b><span>${k}</span></div>`).join('');
+    $('#s2tbl').innerHTML = `<table class="pt">${th(['Couche', 'Sortie', 'Paramètres', 'Compté ?', 'MACs comptés', 'Éléments traités'])}` + layers.map((l) => `<tr class="${counted(l) ? '' : 'ign'}"><td>${l.label}</td><td class="num">${l.out}</td><td class="num">${fmt(l.params + nb(l))}</td><td>${counted(l) ? '✓ oui' : '✗ non'}</td><td class="num">${counted(l) ? fmt(l.macs) : '0'}</td><td class="num">${counted(l) ? '' : fmt(l.elems)}</td></tr>`).join('') + '</table>';
+    const c = D && D.counter, name = sameAs(state.stages);
+    $('#s2note').innerHTML = (c ? `Mesuré par PyTorch sur <code>s03</code> et deux variantes construites par le script d'export : <b>${fmt(c.s03Flops)}</b> FLOPs au complet, <b>${fmt(c.withoutBnRelu)}</b> sans BatchNorm ni ReLU, <b>${fmt(c.withBias)}</b> avec biais (${fmt(c.paramsWithBias)} paramètres au lieu de ${fmt(D.grid.s03.params)}). Rien ne bouge côté FLOPs.` : '')
+      + (name === 's03' && c && flops !== c.s03Flops ? ' <b class="bad">Écart avec PyTorch : à vérifier.</b>' : '')
+      + ' Les « éléments traités » sont des lectures et écritures de cartes d\'activation : ils ne coûtent aucun FLOP compté, mais coûtent du temps (non mesuré ici).';
+  }
+
+  /* 3. late_pool : les positions, pas les poids */
+  function renderS3(M) {
+    const base = build(PRESETS.s03), name = sameAs(state.stages);
+    $('#s3btns').innerHTML = state.stages.map((s, i) => `<button data-i="${i}">Étage ${i + 1} : ${s.pool ? 'retirer le pooling' : 'remettre le pooling'}</button>`).join('') + '<button data-r="1">Revenir à s03</button>';
+    const rows = [['Paramètres', base.params, M.params], ['MACs', base.macs, M.macs], ['FLOPs', base.flops, M.flops]].map(([k, a, b]) => `<tr><td>${k}</td><td class="num">${fmt(a)}</td><td class="num">${fmt(b)}</td><td class="num"><b>× ${fr(b / a, 2)}</b></td></tr>`).join('');
+    $('#s3tbl').innerHTML = `<table class="pt">${th(['', 's03', 'ta config', 'ratio'])}${rows}</table>`;
+    const a = stageMacs(base), b = stageMacs(M), top = Math.max(...a, ...b), n = Math.max(a.length, b.length);
+    $('#s3stages').innerHTML = '<div class="legend"><i></i>MACs de ta config<i class="v"></i>MACs de s03</div>' + Array.from({ length: n }, (_, i) => `<div class="bar-row three"><span>Étage ${i + 1}</span><div class="dual"><div class="bar"><span style="width:${pct(b[i] || 0, top)}%"></span></div><div class="bar b2"><span style="width:${pct(a[i] || 0, top)}%"></span></div></div><span>${fmt(b[i] || 0)} (s03 : ${fmt(a[i] || 0)})</span></div>`).join('');
+    const run = name && RUNS[name], r03 = RUNS.s03;
+    let acc = 'Précision non mesurée pour cette config : seules les 6 configs du rapport ont une <code>val_acc</code> (moyenne de 3 graines).';
+    if (run && r03) {
+      const p1 = run.val_acc, p0 = r03.val_acc, sd = Math.sqrt(p1 * (1 - p1) / VAL_N + p0 * (1 - p0) / VAL_N) * 100;
+      const pm = (r) => `${fr(100 * r.val_acc, 2)} ± ${fr(100 * r.val_std, 2)} %`;   // moyenne ± écart-type entre les 3 graines
+      acc = name === 's03' ? `<code>s03</code> : val_acc ${pm(r03)} (moyenne de 3 graines, 4 époques).`
+        : `<code>${name}</code> : val_acc ${pm(run)} contre ${pm(r03)} pour <code>s03</code> (écart ${pluralPts(100 * (p1 - p0))}, écart-type de tirage d'un écart environ ${fr(sd, 1)} point ; ± : écart-type entre les 3 graines).`;
+    }
+    $('#s3acc').innerHTML = acc;
+  }
+  $('#s3btns').addEventListener('click', (e) => {
+    const b = e.target.closest('button'); if (!b) return;
+    if (b.dataset.r) state.stages = clone(PRESETS.s03); else state.stages[+b.dataset.i].pool = !state.stages[+b.dataset.i].pool;
+    buildRows(); refresh();
+  });
+  ['#s2bn', '#s2relu', '#s2bias'].forEach((id) => $(id).addEventListener('change', refresh));
+
+  /* 4. Simulation jouet d'un GPU asynchrone */
+  const s4 = { n: 20, s: 30, g: 100 };
+  function sim(n, s, g) {
+    let free = 0; const sub = [], gpu = [];
+    for (let i = 0; i < n; i++) {
+      const t1 = (i + 1) * s, start = Math.max(t1, free);
+      sub.push([i * s, t1]); free = start + g; gpu.push([start, free]);
+    }
+    return { sub, gpu, nosync: n * s, sync: free };
+  }
+  function renderS4() {
+    ['n', 's', 'g'].forEach((k) => { $('#s4' + k).value = s4[k]; $('#s4' + k + 'out').textContent = k === 'n' ? s4.n : `${s4[k]} µs`; });
+    const r = sim(s4.n, s4.s, s4.g), T = Math.max(r.sync, r.nosync);
+    const seg = ([a, b]) => `<div class="seg" style="left:${100 * a / T}%;width:${100 * (b - a) / T}%"></div>`;
+    const side = (x) => (x / T > 0.6 ? ' r' : '');
+    $('#s4lanes').innerHTML = `<div class="lanelab">Python : soumission des ${s4.n} opérations</div><div class="lane">${r.sub.map(seg).join('')}</div><div class="lanelab">GPU : calcul des ${s4.n} opérations</div><div class="lane gpu">${r.gpu.map(seg).join('')}</div>`
+      + `<div class="axis"><div class="mk${side(r.nosync)}" style="left:${100 * r.nosync / T}%">sans synchronize : ${fmt(r.nosync)} µs</div><div class="mk g${side(r.sync)}" style="left:${100 * r.sync / T}%">avec : ${fmt(r.sync)} µs</div></div>`;
+    const ratio = r.sync / r.nosync;
+    $('#s4stats').innerHTML = [[`${fmt(r.nosync)} µs`, 'Sans synchronize'], [`${fmt(r.sync)} µs`, 'Avec synchronize'], [`× ${fr(ratio, 2)}`, 'Sous-estimation sans'], [s4.s >= s4.g ? 'la soumission' : 'le calcul GPU', 'Goulot d\'étranglement']].map(([v, k]) => `<div class="stat"><b>${v}</b><span>${k}</span></div>`).join('');
+    $('#s4note').innerHTML = ratio < 1.1
+      ? 'L\'écart est faible : la soumission domine, le GPU a fini presque en même temps que Python. La latence mesurée dit alors peu de choses sur le calcul (c\'est le cas à batch 1, section 5).'
+      : `Sans synchronize, l'horloge s'arrête quand Python a fini de déposer les opérations, alors que le GPU calcule encore : la latence est sous-estimée d'un facteur ${fr(ratio, 1)}. Valeurs jouet : le palier n'a pas mesuré cette variante.`;
+  }
+  const s4set = (v) => { Object.assign(s4, v); renderS4(); };
+  ['n', 's', 'g'].forEach((k) => $('#s4' + k).addEventListener('input', (e) => { s4[k] = +e.target.value; renderS4(); }));
+  $('#s4short').addEventListener('click', () => s4set({ g: 10 }));
+  $('#s4long').addEventListener('click', () => s4set({ g: 100 }));
+  $('#s4reset').addEventListener('click', () => s4set({ n: 20, s: 30, g: 100 }));
+
+  /* 5. Série de passes jouet : warm-up, médiane, moyenne (bruit à graine fixe) */
+  const mulberry32 = (a) => () => { a |= 0; a = (a + 0x6D2B79F5) | 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+  const S5N = 112, rng5 = mulberry32(7);
+  const S5NOISE = Array.from({ length: S5N }, () => (rng5() * 2 - 1) * 0.04);
+  const S5SPIKES = { 23: 4, 47: 3, 71: 5, 96: 3.5 };
+  const cold = (i) => (i < 8 ? 5 * Math.pow(0.5, i) : 0);
+  const s5 = { t: 1, w: 0, r: 50, sp: false };
+  const s5time = (i) => s5.t * (1 + cold(i)) * (1 + S5NOISE[i]) * (s5.sp ? (S5SPIKES[i] || 1) : 1);
+  function renderS5() {
+    $('#s5t').value = s5.t; $('#s5w').value = s5.w; $('#s5r').value = s5.r; $('#s5sp').checked = s5.sp;
+    $('#s5tout').textContent = `${fr(s5.t, 1)} ms`; $('#s5wout').textContent = s5.w; $('#s5rout').textContent = s5.r;
+    const total = s5.w + s5.r, all = Array.from({ length: total }, (_, i) => s5time(i)), used = all.slice(s5.w);
+    const mn = mean(used), md = median(used), top = 7 * s5.t, W = 640, H = 150, bw = (W - 10) / total;
+    const y = (v) => H - 14 - (H - 24) * Math.min(v, top) / top;
+    const bars = all.map((v, i) => `<rect x="${(i * bw + 2).toFixed(1)}" y="${y(v).toFixed(1)}" width="${Math.max(bw - 1, 1).toFixed(1)}" height="${(H - 14 - y(v)).toFixed(1)}" style="fill:${i < s5.w ? 'var(--line)' : S5SPIKES[i] && s5.sp ? 'var(--bad)' : 'var(--accent)'}"></rect>`).join('');
+    const line = (v, color, label, dash) => `<line x1="0" x2="${W - 10}" y1="${y(v)}" y2="${y(v)}" style="stroke:${color};stroke-width:2;${dash ? 'stroke-dasharray:5 4' : ''}"></line>`;
+    $('#s5plot').innerHTML = `<svg class="plot" viewBox="0 0 ${W} ${H}" role="img" aria-label="Durée de chaque passe">${bars}${line(s5.t, 'var(--muted)', 'vrai', true)}${line(md, 'var(--ok)', 'méd.')}${line(mn, 'var(--hl)', 'moy.')}</svg><div class="legend"><i style="background:var(--line)"></i>écartées (warm-up)<i></i>chronométrées<i style="background:var(--bad)"></i>passe gênée · lignes : <b style="color:var(--muted)">vrai temps</b> (tirets), <b style="color:var(--ok)">médiane</b>, <b style="color:var(--hl)">moyenne</b></div>`;
+    const err = (v) => `${v >= s5.t ? '+' : ''}${fr(100 * (v / s5.t - 1), 1)} %`;
+    $('#s5stats').innerHTML = [[`${fr(all[0], 2)} ms`, `Première passe (× ${fr(all[0] / s5.t, 1)})`], [`${fr(md, 3)} ms`, `Médiane (${err(md)})`], [`${fr(mn, 3)} ms`, `Moyenne (${err(mn)})`]].map(([v, k]) => `<div class="stat"><b>${v}</b><span>${k}</span></div>`).join('');
+    $('#s5note').innerHTML = `Écart au vrai temps : médiane ${err(md)}, moyenne ${err(mn)}. ` + (s5.w === 0 ? 'Sans warm-up, les passes à froid entrent dans la mesure.' : 'Les passes à froid sont écartées.') + (s5.sp ? ' Les passes gênées tirent la moyenne bien plus que la médiane.' : '') + ' Série jouet : bruit de ±4 % à graine fixe, passes à froid et passes gênées inventées.';
+  }
+  ['t', 'w', 'r'].forEach((k) => $('#s5' + k).addEventListener('input', (e) => { s5[k] = +e.target.value; renderS5(); }));
+  $('#s5sp').addEventListener('change', (e) => { s5.sp = e.target.checked; renderS5(); });
+  $('#s5proto').addEventListener('click', () => { s5.w = 10; s5.r = 50; renderS5(); });
+  $('#s5zero').addEventListener('click', () => { s5.w = 0; s5.r = 50; renderS5(); });
+
+  /* 6. CPU contre mps : mesures du rapport, puis droite à deux points */
+  const s6 = { batch: 1, cfg: 's03', bi: 3 };
+  const BATCHES = [1, 2, 4, 8, 16, 32, 64, 128, 256];
+  const ratios = (b) => NAMES.map((n) => { const r = RUNS[n], m = r[`latency_mps_b${b}_ms`], c = r[`latency_cpu_b${b}_ms`]; return { n, m, c, win: c < m ? 'CPU' : 'mps', x: Math.max(m, c) / Math.min(m, c) }; });
+  function renderS6() {
+    if (!D) { $('#s6bars').innerHTML = '<p class="muted">Données absentes.</p>'; return; }
+    $('#s6b').innerHTML = [1, 64].map((b) => `<button data-b="${b}"${s6.batch === b ? ' class="on"' : ''}>Batch ${b}</button>`).join('') + '<span class="legend"><i></i>mps<i class="v"></i>CPU</span>';
+    const rs = ratios(s6.batch), top = Math.max(...rs.map((r) => Math.max(r.m, r.c)));
+    $('#s6bars').innerHTML = rs.map((r) => `<div class="bar-row three"><span><b>${r.n}</b></span><div class="dual"><div class="bar"><span style="width:${pct(r.m, top)}%"></span></div><div class="bar b2"><span style="width:${pct(r.c, top)}%"></span></div></div><span>mps ${fr(r.m, 3)} ms · CPU ${fr(r.c, 3)} ms · <b class="${r.win === 'CPU' ? 'up' : 'down'}">${r.win} × ${fr(r.x, 1)}</b></span></div>`).join('');
+    const w = rs.filter((r) => r.win === 'CPU').length, lo = rs.reduce((a, r) => (r.x < a.x ? r : a)), hi = rs.reduce((a, r) => (r.x > a.x ? r : a));
+    $('#s6range').innerHTML = `Batch ${s6.batch} : le CPU gagne pour ${w} config${w > 1 ? 's' : ''} sur 6, mps pour ${6 - w}. L'écart va de × ${fr(lo.x, 1)} (${lo.n}) à × ${fr(hi.x, 1)} (${hi.n}).`;
+    $('#s6cfg').innerHTML = NAMES.map((n) => `<button data-c="${n}"${s6.cfg === n ? ' class="on"' : ''}>${n}</button>`).join('');
+    renderS6c();
+  }
+  // Variabilité d'un run à l'autre : (max - min) / médiane des 3 runs finaux d'une latence.
+  const spreadOf = (r, k) => { const v = r.lat_runs[k]; return (Math.max(...v) - Math.min(...v)) / r[k]; };
+  const fit6 = (r, dev) => { const l1 = r[`latency_${dev}_b1_ms`], l64 = r[`latency_${dev}_b64_ms`], slope = (l64 - l1) / 63; return { a: l1 - slope, slope }; };
+  const cross6 = (r) => { const m = fit6(r, 'mps'), c = fit6(r, 'cpu'); return c.slope > m.slope && m.a > c.a ? (m.a - c.a) / (c.slope - m.slope) : null; };
+  function renderS6c() {
+    const r = RUNS[s6.cfg], m = fit6(r, 'mps'), c = fit6(r, 'cpu'), b = BATCHES[s6.bi], bx = cross6(r);
+    $('#s6bsout').textContent = `${b}${b === 1 || b === 64 ? ' (mesuré)' : ' (extrapolé)'}`;
+    const W = 640, H = 250, L = 46, R = 14, T = 12, B = 30, pw = W - L - R, ph = H - T - B;
+    const f = (d, x) => d.a + d.slope * x, ymax = Math.max(f(m, 64), f(c, 64)) * 1.15;
+    const X = (x) => L + pw * Math.log2(x) / 8, Y = (v) => T + ph * (1 - v / ymax);
+    const pts = (d, a, z) => { const o = []; for (let k = 0; k <= 40; k++) { const x = Math.pow(2, Math.log2(a) + (Math.log2(z) - Math.log2(a)) * k / 40); o.push(`${X(x).toFixed(1)},${Y(f(d, x)).toFixed(1)}`); } return o.join(' '); };
+    const clip = `<clipPath id="clip6"><rect x="${L}" y="${T}" width="${pw}" height="${ph}"></rect></clipPath>`;
+    const poly = (d, color) => `<polyline points="${pts(d, 1, 64)}" style="fill:none;stroke:${color};stroke-width:2.5"></polyline><polyline points="${pts(d, 64, 256)}" style="fill:none;stroke:${color};stroke-width:2.5;stroke-dasharray:5 4"></polyline>`;
+    const dot = (d, x, color) => `<circle cx="${X(x)}" cy="${Y(f(d, x))}" r="5" style="fill:${color}"></circle>`;
+    const ticks = BATCHES.map((x) => `<text x="${X(x)}" y="${H - 10}" text-anchor="middle">${x}</text>`).join('') + [0, 0.5, 1].map((q) => `<text x="${L - 6}" y="${Y(q * ymax) + 4}" text-anchor="end">${fr(q * ymax, 1)}</text>`).join('');
+    $('#s6plot').innerHTML = `<svg class="plot" viewBox="0 0 ${W} ${H}" role="img" aria-label="Latence en fonction du batch">${clip}${ticks}<line x1="${L}" x2="${L}" y1="${T}" y2="${T + ph}" style="stroke:var(--line)"></line><line x1="${L}" x2="${W - R}" y1="${T + ph}" y2="${T + ph}" style="stroke:var(--line)"></line>`
+      + '<g clip-path="url(#clip6)">' + poly(m, 'var(--accent)') + poly(c, 'var(--hl)') + '</g>' + dot(m, 1, 'var(--accent)') + dot(m, 64, 'var(--accent)') + dot(c, 1, 'var(--hl)') + dot(c, 64, 'var(--hl)')
+      + `<line x1="${X(b)}" x2="${X(b)}" y1="${T}" y2="${T + ph}" style="stroke:var(--text);stroke-dasharray:2 3"></line>` + (bx && bx >= 1 && bx <= 256 ? `<circle cx="${X(bx)}" cy="${Y(f(m, bx))}" r="7" style="fill:none;stroke:var(--ok);stroke-width:3"></circle>` : '')
+      + `<text x="${L + 10}" y="${T + 12}">ms en ordonnée, batch en abscisse (log)</text></svg><div class="legend"><i></i>mps<i class="v"></i>CPU · pleins : mesurés, tirets : extrapolés · cercle vert : croisement</div>`;
+    const pm = f(m, b), pc = f(c, b);
+    $('#s6stats').innerHTML = [[`${fr(pm, 2)} ms`, `mps au batch ${b}`], [`${fr(pc, 2)} ms`, `CPU au batch ${b}`], [pm < pc ? 'mps' : 'CPU', 'Plus rapide ici'], [bx ? `≈ ${fr(bx, 1)}` : 'jamais', 'Batch de croisement estimé']].map(([v, k]) => `<div class="stat"><b>${v}</b><span>${k}</span></div>`).join('');
+    const tiny = fit6(RUNS.tiny, 'mps'), wide = fit6(RUNS.wide, 'mps'), fixed = NAMES.map((n) => fit6(RUNS[n], 'mps').a), sp = Math.max(...NAMES.map((n) => spreadOf(RUNS[n], 'latency_mps_b1_ms')));
+    $('#s6note').innerHTML = `Pour <code>${s6.cfg}</code> : mps a un coût fixe a = ${fr(m.a, 2)} ms et ${fr(m.slope * 1000, 1)} µs par image ; le CPU a = ${fr(c.a, 2)} ms et ${fr(c.slope * 1000, 1)} µs par image. Ce coût fixe de mps (${fr(Math.min(...fixed), 1)} à ${fr(Math.max(...fixed), 1)} ms selon la config) ressemble à du coût de soumission, mais son ordre entre configs (tiny ${fr(tiny.a, 2)} ms, wide ${fr(wide.a, 2)} ms) est du même ordre que le bruit : d'un run à l'autre, la latence mps batch 1 d'une même config varie jusqu'à ${fr(100 * sp, 0)} % de sa médiane. Chaque point mesuré est la médiane de 3 runs.`;
+  }
+  $('#s6a').addEventListener('click', (e) => { const b = e.target.closest('button[data-b]'); if (!b) return; s6.batch = +b.dataset.b; renderS6(); });
+  $('#s6cfg').addEventListener('click', (e) => { const b = e.target.closest('button[data-c]'); if (!b) return; s6.cfg = b.dataset.c; renderS6(); });
+  $('#s6bs').addEventListener('input', (e) => { s6.bi = +e.target.value; renderS6c(); });
+  function renderS6warn() {
+    if (!D) return;
+    const r1 = ratios(1), r64 = ratios(64), lo1 = r1.reduce((a, r) => (r.x < a.x ? r : a)), hi1 = r1.reduce((a, r) => (r.x > a.x ? r : a)), lo64 = r64.reduce((a, r) => (r.x < a.x ? r : a)), hi64 = r64.reduce((a, r) => (r.x > a.x ? r : a));
+    const n2 = r1.filter((r) => r.x < 2).length, n3 = r64.filter((r) => r.x < 3).length;
+    $('#s6warn').innerHTML = `<b>Écart avec le rapport.</b> Le rapport (section 5) écrit que le CPU est « 2 à 5 fois » plus rapide à batch 1 et que mps est « 3 à 6 fois » plus rapide à batch 64. Avec les nombres de son tableau (médianes de 3 runs), le rapport CPU / mps va de × ${fr(lo1.x, 1)} (${lo1.n}) à × ${fr(hi1.x, 1)} (${hi1.n}) à batch 1, dont ${n2} config${n2 > 1 ? 's' : ''} sous × 2, et de × ${fr(lo64.x, 1)} (${lo64.n}) à × ${fr(hi64.x, 1)} (${hi64.n}) à batch 64, dont ${n3} config${n3 > 1 ? 's' : ''} sous × 3. À corriger dans le rapport avant de le citer.`;
+  }
+
+  /* 7. Les MACs classent-ils la latence ? Spearman et paires inversées */
+  const ranks = (v) => { const o = v.map((x, i) => i).sort((i, j) => v[i] - v[j]), r = Array(v.length); let i = 0; while (i < o.length) { let j = i; while (j + 1 < o.length && v[o[j + 1]] === v[o[i]]) j++; for (let k = i; k <= j; k++) r[o[k]] = (i + j) / 2 + 1; i = j + 1; } return r; };
+  const spearman = (a, b) => { const ra = ranks(a), rb = ranks(b), ma = mean(ra), mb = mean(rb); return sum(ra.map((x, i) => (x - ma) * (rb[i] - mb))) / Math.sqrt(sum(ra.map((x) => (x - ma) ** 2)) * sum(rb.map((y) => (y - mb) ** 2))); };
+  const rho = (metric, key) => spearman(D.runs.map((r) => r[metric]), D.runs.map((r) => r[key]));
+  const s7 = { metric: 'macs_b1', key: 'latency_mps_b64_ms' };
+  const METRICS = [['n_params', 'Paramètres'], ['macs_b1', 'MACs']];
+  function renderS7() {
+    if (!D) { $('#s7hm').innerHTML = '<p class="muted">Données absentes.</p>'; return; }
+    const cell = (m, k) => { const v = rho(m, k), p = Math.round(Math.abs(v) * 85); return `<td><button data-m="${m}" data-k="${k}" class="${s7.metric === m && s7.key === k ? 'sel' : ''}${p > 45 ? ' hot' : ''}" style="background:color-mix(in srgb, var(${v >= 0 ? '--ok' : '--bad'}) ${p}%, var(--surface))">${fr(v, 2)}</button></td>`; };
+    $('#s7hm').innerHTML = `<table class="hm"><tr><th></th>${KEYS.map(([, l]) => `<th>${l}</th>`).join('')}</tr>` + METRICS.map(([m, l]) => `<tr><th class="rl">ρ ${l} / latence</th>${KEYS.map(([k]) => cell(m, k)).join('')}</tr>`).join('') + '</table>';
+    const runs = D.runs, mv = runs.map((r) => r[s7.metric]), lv = runs.map((r) => r[s7.key]), rm = ranks(mv), rl = ranks(lv);
+    const inv = [];
+    for (let i = 0; i < runs.length; i++) for (let j = i + 1; j < runs.length; j++) if (mv[i] !== mv[j] && (mv[i] - mv[j]) * (lv[i] - lv[j]) < 0) { const [lo, hi] = mv[i] < mv[j] ? [i, j] : [j, i]; inv.push({ lo, hi, gap: mv[hi] / mv[lo], slow: lv[lo] / lv[hi] }); }
+    inv.sort((a, b) => a.gap - b.gap);
+    const lab = METRICS.find(([m]) => m === s7.metric)[1], dev = KEYS.find(([k]) => k === s7.key)[1], r0 = rho(s7.metric, s7.key);
+    $('#s7stats').innerHTML = [[fr(r0, 2), `ρ (${lab} contre latence ${dev})`], [`${inv.length} sur 15`, 'Paires inversées'], [inv.length ? `× ${fr(Math.max(...inv.map((x) => x.gap)), 1)}` : '-', `Plus grand écart de ${lab} inversé`]].map(([v, k]) => `<div class="stat"><b>${v}</b><span>${k}</span></div>`).join('');
+    const order = runs.map((r, i) => i).sort((i, j) => lv[i] - lv[j]);
+    $('#s7tbl').innerHTML = `<table class="pt">${th(['Rang latence', 'Config', `Latence ${dev} (ms)`, lab, `Rang ${lab}`, ''])}` + order.map((i, k) => `<tr><td class="num">${k + 1}</td><td><b>${runs[i].config_name}</b></td><td class="num">${fr(lv[i], 3)}</td><td class="num">${s7.metric === 'macs_b1' ? fr(mv[i] / 1e6, 2) + ' M' : fmt(mv[i])}</td><td class="num">${fr(rm[i], rm[i] % 1 ? 1 : 0)}</td><td>${Math.abs(rm[i] - rl[i]) > 0.01 ? '<span class="tag2 fr">rang différent</span>' : ''}</td></tr>`).join('') + '</table>';
+    $('#s7inv').innerHTML = inv.length ? inv.map((x) => `<li><b>${runs[x.lo].config_name}</b> a ${fr(x.gap, 2)} fois moins de ${lab} que <b>${runs[x.hi].config_name}</b>, mais est ${fr(100 * (x.slow - 1), 0)} % plus lente.</li>`).join('') : '<li>Aucune paire inversée : le classement par ' + lab + ' est exactement celui de la latence.</li>';
+    const ok = Object.entries(D.checks.spearman).every(([k, v]) => { const [m, key] = k.split('|'); return Math.abs(rho(m, key) - v) < 1e-3; });
+    $('#s7chk').innerHTML = `${ok ? '<span class="okc">✓</span>' : '<b class="bad">Écart :</b>'} les 8 corrélations de la page ${ok ? 'sont identiques à celles que Python a calculées' : 'diffèrent de celles de Python'} (les égalités reçoivent le rang moyen). Avec 6 configs, un ρ est une indication, pas un test statistique.`;
+  }
+  $('#s7c').addEventListener('click', (e) => { const b = e.target.closest('button[data-m]'); if (!b) return; s7.metric = b.dataset.m; s7.key = b.dataset.k; renderS7(); });
+  function renderS7warn() {
+    if (!D) return;
+    const d = D.grid.deep, w = D.grid.wide, rd = RUNS.deep, rw = RUNS.wide;
+    $('#s7warn').innerHTML = `<b>Écart avec le rapport.</b> Le rapport (section 5) cite mps batch 64 comme une divergence entre FLOPs et latence. Or <code>deep</code> a moins de FLOPs que <code>wide</code> (${fr(d.flops / 1e6, 2)} M contre ${fr(w.flops / 1e6, 2)} M) et y est plus rapide (${fr(rd.latency_mps_b64_ms, 3)} ms contre ${fr(rw.latency_mps_b64_ms, 3)} ms) : les deux classements concordent (ρ = ${fr(rho('macs_b1', 'latency_mps_b64_ms'), 2)}). La vraie divergence wide / deep est sur CPU, à batch 1 et à batch 64.`;
+  }
+
+  /* 8. Frontière coût-précision */
+  const s8 = { cost: 'macs_b1' };
+  const COSTS = [['n_params', 'Paramètres'], ['macs_b1', 'MACs'], ...KEYS.map(([k, l]) => [k, l])];
+  function dominance(cost) {
+    const runs = D.runs;
+    return runs.map((r) => {
+      const doms = runs.filter((o) => o !== r && o[cost] <= r[cost] && o.val_acc >= r.val_acc && (o[cost] < r[cost] || o.val_acc > r.val_acc));
+      const detail = doms.map((o) => { const sd = Math.sqrt(o.val_acc * (1 - o.val_acc) / VAL_N + r.val_acc * (1 - r.val_acc) / VAL_N); return { o, gap: o.val_acc - r.val_acc, sd, robust: o.val_acc - r.val_acc >= 2 * sd }; });
+      return { r, doms: detail, dominated: doms.length > 0, robust: detail.some((x) => x.robust) };
+    });
+  }
+  function renderS8() {
+    if (!D) { $('#s8plot').innerHTML = '<p class="muted">Données absentes.</p>'; return; }
+    $('#s8b').innerHTML = COSTS.map(([k, l]) => `<button data-k="${k}"${s8.cost === k ? ' class="on"' : ''}>${l}</button>`).join('');
+    const dom = dominance(s8.cost), c = s8.cost, xs = D.runs.map((r) => r[c]);
+    const W = 640, H = 300, L = 46, R = 22, T = 14, B = 34, pw = W - L - R, ph = H - T - B;
+    const lo = Math.log(Math.min(...xs) * 0.7), hi = Math.log(Math.max(...xs) * 1.4), X = (x) => L + pw * (Math.log(x) - lo) / (hi - lo), Y = (a) => T + ph * (1 - (a - 0.4) / 0.5);
+    const front = dom.filter((d) => !d.dominated).sort((a, b) => a.r[c] - b.r[c]);
+    const poly = `<polyline points="${front.map((d) => `${X(d.r[c]).toFixed(1)},${Y(d.r.val_acc).toFixed(1)}`).join(' ')}" style="fill:none;stroke:var(--accent);stroke-width:2.5"></polyline>`;
+    const pts = dom.map((d, i) => `<circle cx="${X(d.r[c]).toFixed(1)}" cy="${Y(d.r.val_acc).toFixed(1)}" r="7" style="${d.dominated ? 'fill:var(--surface);stroke:var(--muted);stroke-width:2' : 'fill:var(--accent)'}"></circle><text class="lab" x="${(X(d.r[c]) + 10).toFixed(1)}" y="${(Y(d.r.val_acc) + (i % 2 ? 16 : -8)).toFixed(1)}" style="${d.dominated ? 'fill:var(--muted)' : ''}">${d.r.config_name}</text>`).join('');
+    const yt = [0.4, 0.5, 0.6, 0.7, 0.8].map((a) => `<text x="${L - 6}" y="${Y(a) + 4}" text-anchor="end">${Math.round(a * 100)} %</text><line x1="${L}" x2="${W - R}" y1="${Y(a)}" y2="${Y(a)}" style="stroke:var(--line);stroke-width:.5"></line>`).join('');
+    const lbl = COSTS.find(([k]) => k === c)[1];
+    $('#s8plot').innerHTML = `<svg class="plot" viewBox="0 0 ${W} ${H}" role="img" aria-label="Précision en fonction du coût">${yt}${poly}${pts}<text x="${W / 2}" y="${H - 8}" text-anchor="middle">coût : ${lbl}${c.startsWith('latency') ? ' (ms)' : ''}, échelle log, plus à gauche = moins cher</text></svg><div class="legend"><i></i>sur la frontière<i style="background:var(--surface);border:2px solid var(--muted)"></i>dominée</div>`;
+    const names = front.map((d) => d.r.config_name);
+    $('#s8list').innerHTML = `<b>Frontière (${lbl}) :</b> ${names.join(', ')}.` + dom.filter((d) => d.dominated).map((d) => {
+      const best = d.doms.reduce((a, x) => (x.gap > a.gap ? x : a));
+      return `<br><code>${d.r.config_name}</code> est dominée par <code>${best.o.config_name}</code> (+${pluralPts(100 * best.gap)} de précision, 2 écarts-types ≈ ${fr(200 * best.sd, 1)} points) <span class="tag2 ${d.robust ? '' : 'fr'}">${d.robust ? 'écart net' : 'fragile'}</span>`;
+    }).join('') + '<br><span class="muted">Fragile : l\'écart de précision (moyenne de 3 graines) est sous 2 écarts-types de tirage de la validation ; on ne peut pas trancher.</span>';
+    const py = D.checks.front[c].join(',') === [...names].sort().join(',');
+    $('#s8list').insertAdjacentHTML('beforeend', `<br>${py ? '<span class="okc">✓</span> Frontière identique à celle de Python.' : '<b class="bad">Écart avec Python.</b>'}`);
+  }
+  $('#s8b').addEventListener('click', (e) => { const b = e.target.closest('button[data-k]'); if (!b) return; s8.cost = b.dataset.k; renderS8(); });
+
+  /* ---------- Canvas : aucun (SVG avec variables CSS), le thème s'applique seul ---------- */
+
+  /* ---------- Quiz : toujours présent, 7 questions ici (6 à 8 quand d'autres évaluations existent, 10 au maximum) ---------- */
+  // Une question = { q, multi, trap, fausse, obj, ref, o: [{ t, ok, why, fix }] }. 10 questions maximum.
+  //  - obj      : id de l'objectif (data-obj de la liste « À la fin de cette page, tu sauras ») que la question vérifie ; chaque objectif a au moins une question.
+  //  - FORMAT PAR DÉFAUT « trouve la fausse » (fausse: true) : 3 affirmations VRAIES et 1 FAUSSE, le lecteur désigne la fausse.
+  //    Ici `ok` dit si l'AFFIRMATION est vraie (le moteur inverse : la bonne réponse est celle qui a ok:false).
+  //    La proposition fausse porte `fix` (sa version correcte, affichée sous l'énoncé barré) et `why` (pourquoi elle tente).
+  //    Raison : on ne lit qu'UNE affirmation fausse (contre 3 dans un QCM classique), et elle est corrigée aussitôt.
+  //  - QCM classique (sans fausse) : réservé aux calculs (options = résultats) et aux questions où la bonne réponse est un fait précis ;
+  //  - o[i].why : pourquoi cette proposition est vraie ou fausse (affiché pour TOUTES les propositions) ;
+  //  - pas de `why` au niveau de la question (il ferait doublon) ; équilibrer la longueur des propositions `t` ;
+  //  - ref      : ancre de la section de la page où la réponse est établie (ex. '#s2'). Après une erreur, le moteur affiche des liens « À relire »
+  //               avec le titre de la section ; une proposition peut avoir son propre `ref` (ancre plus précise : un id de paragraphe).
+  // Chaque question a une case « Je suis sûr·e » : le verdict s'adapte (erreur sûre = la plus utile à corriger) et le score affiche la calibration.
+  // Chaque bonne réponse et chaque piège doivent être fondés sur ce que la page a déjà montré ou dit.
+  const QUIZ = [
+    { q: 'À propos de ce que compte <b>FlopCounterMode</b>, laquelle de ces affirmations est <b>fausse</b> ?', fausse: true, obj: 'o2', ref: '#s2',
+      o: [
+        { t: 'Il compte aussi BatchNorm et ReLU : retirer ces couches fait baisser le total de FLOPs', ok: false, fix: 'Il ne compte que les convolutions et les produits matriciels : s03 donne 20 646 400 FLOPs avec ou sans BatchNorm et ReLU.', why: 'Ces couches font des opérations, donc on les croit comptées ; mais le compteur ne reconnaît que les produits matriciels et les convolutions (section 2).' },
+        { t: 'Les biais des convolutions n\'entrent pas dans le compte, seuls les produits comptent', ok: true, why: 'Ajouter des biais change le nombre de paramètres (94 986 au lieu de 94 762) mais pas le total de FLOPs mesuré.' },
+        { t: 'La tête Linear du réseau est comptée au même titre que les convolutions, un produit', ok: true, why: 'C\'est un produit matriciel : 1 280 MACs pour s03, soit 128 · 10.' },
+        { t: 'Le compte ignore les lectures et écritures mémoire des cartes d\'activation entre couches', ok: true, why: 'Le compteur donne un minimum de calcul ; la mémoire manipulée n\'y figure pas, d\'où le décalage possible avec la latence.' },
+      ] },
+    { q: 'À propos de la <b>répartition du coût de s03</b>, laquelle de ces affirmations est <b>fausse</b> ?', fausse: true, trap: true, obj: 'o1', ref: '#s1',
+      o: [
+        { t: 'L\'étage 3 pèse quatre fois plus de MACs que l\'étage 2, puisqu\'il a quatre fois plus de paramètres', ok: false, fix: 'Les étages 2 et 3 pèsent le même nombre de MACs (4 718 592) : 4 fois plus de paramètres, 4 fois moins de positions.', why: 'On oublie que les MACs sont des paramètres multipliés par les positions, et que le pooling divise les positions par quatre.' },
+        { t: 'La première convolution a peu de paramètres mais pèse beaucoup de MACs, car sa carte est la plus grande', ok: true, why: '864 paramètres appliqués à 1 024 positions : 884 736 MACs, soit 8,6 % du total pour 0,9 % des paramètres.' },
+        { t: 'Le pooling divise par quatre le nombre de positions des convolutions de l\'étage suivant', ok: true, why: 'La carte passe de H · W à H/2 · W/2.' },
+        { t: 'Doubler les canaux d\'entrée et de sortie d\'une convolution multiplie ses paramètres par quatre', ok: true, why: 'Les paramètres valent c_out · c_in · k · k : deux facteurs doublent.' },
+      ] },
+    { q: 'Calcul : <code>late_pool</code> garde les 94 762 paramètres de <code>s03</code> mais retire le pooling de l\'étage 2. Par quel facteur ses MACs totaux sont-ils multipliés ?', obj: 'o3', ref: '#s3',
+      o: [
+        { t: '× 2,37', ok: true, why: 'Seul l\'étage 3 change : 73 728 paramètres sur 256 positions au lieu de 64, soit 18 874 368 MACs au lieu de 4 718 592. Le total passe de 10,3 M à 24,5 M.' },
+        { t: '× 4', ok: false, why: 'C\'est le facteur des positions de l\'étage 3 seul, pas celui du réseau entier : les étages 1 et 2 ne changent pas.' },
+        { t: '× 1', ok: false, why: 'Mêmes paramètres ne veut pas dire même calcul : les poids servent sur plus de positions.' },
+        { t: '× 1,5', ok: false, why: 'Trop faible : l\'étage 3 pèse déjà près de la moitié du total et son calcul est multiplié par quatre.' },
+      ] },
+    { q: 'À propos de la <b>fiabilité d\'une mesure de latence</b>, laquelle de ces affirmations est <b>fausse</b> ?', fausse: true, obj: 'o4', ref: '#s4',
+      o: [
+        { t: 'La moyenne résiste mieux que la médiane aux passes perturbées : elle les utilise toutes', ok: false, fix: 'Une passe très lente tire la moyenne mais presque pas la médiane : le code garde la médiane de 50 passes.', why: 'Utiliser toutes les passes semble plus rigoureux, mais cela donne aux passes perturbées le même poids qu\'aux autres.' },
+        { t: 'Les premières passes sont écartées parce que les noyaux se compilent et la mémoire s\'alloue', ok: true, why: 'C\'est le warm-up : 10 passes jetées avant les 50 chronométrées.' },
+        { t: 'Le code chronomètre 50 passes après 10 passes d\'échauffement, chacune suivie de synchronize', ok: true, why: 'Lignes 59 à 66 de measure_latency.' },
+        { t: 'Timer et la boucle manuelle donnent 0,234 et 0,227 ms sur CPU, environ 3 % d\'écart', ok: true, why: 'Recoupement ponctuel du rapport (s03, batch 1) ; il ne couvre pas mps, et d\'un run à l\'autre une même latence varie de bien plus que 3 %.' },
+      ] },
+    { q: 'À propos du <b>CPU contre mps</b> sur ce Mac, laquelle de ces affirmations est <b>fausse</b> ?', fausse: true, trap: true, obj: 'o5', ref: '#s5',
+      o: [
+        { t: 'Le GPU est plus rapide que le CPU pour les six configs, quel que soit le batch', ok: false, fix: 'À batch 1 le CPU est plus rapide pour les six configs (× 1,3 à × 4,8) ; mps gagne à batch 64 (seuls les batchs 1 et 64 sont mesurés).', why: 'On croit le GPU toujours plus rapide ; mais un coût fixe de lancement, hypothèse plausible, n\'est pas rentabilisé par le calcul d\'une seule image.' },
+        { t: 'À batch 64, mps est de 1,7 à 6,5 fois plus rapide que le CPU selon la config', ok: true, why: 'C\'est la plage des rapports CPU / mps à batch 64 dans le tableau du rapport (médianes de 3 runs).' },
+        { t: 'À batch 1, la latence mps change peu d\'une config à l\'autre, entre 0,4 et 0,9 ms', ok: true, why: 'Elle varie d\'un facteur 2 (0,419 ms pour s03, 0,866 ms pour deep) alors que les MACs varient d\'un facteur 24.' },
+        { t: 'L\'explication par le coût de soumission est plausible mais le palier ne l\'a pas isolée', ok: true, why: 'Aucune mesure ne sépare soumission et calcul ; c\'est une hypothèse cohérente avec la section 4.' },
+      ] },
+    { q: 'Pour un NAS qui cible un matériel précis, quel objectif de coût faut-il retenir ?', obj: 'o6', ref: '#s6',
+      o: [
+        { t: 'La latence mesurée sur la cible, au batch visé', ok: true, why: 'Les FLOPs et les paramètres ne classent pas la latence de la même façon sur chaque device et chaque batch, et la frontière change avec la métrique.' },
+        { t: 'Les FLOPs, qui gardent le même ordre sur tous les matériels', ok: false, why: 'Faux : à batch 1 le classement par MACs n\'est que moyen (ρ = 0,60 sur mps, 0,66 sur CPU), et sur CPU deux paires de configs sont inversées à batch 64.' },
+        { t: 'Les paramètres, qui fixent la mémoire donc la vitesse', ok: false, why: 'late_pool a les mêmes paramètres que s03 pour 2,37 fois plus de MACs : les paramètres ne disent pas le calcul.' },
+        { t: 'Le temps d\'entraînement, reflet du coût d\'inférence', ok: false, why: 'Il dépend de la rétropropagation et de la taille du lot d\'entraînement, pas de la passe avant à batch 1.' },
+      ] },
+  ];
+  // La bonne réponse (ou l'affirmation fausse, pour `fausse`) est écrite en premier ci-dessus : on tourne les propositions (ordre fixe, reproductible) pour varier sa position.
+  QUIZ.forEach((x, qi) => { const k = (qi * 3 + 1) % x.o.length; x.o = x.o.slice(k).concat(x.o.slice(0, k)); });
+  const quizState = QUIZ.map(() => null);
+  const quizBox = $('#quizBox');
+  const loadMissed = () => store.get('quiz_missed', []).filter((m) => m && typeof m === 'object');   // [{ q, sure }]
+  const saveMissed = (m) => store.set('quiz_missed', m);
+  const shuffle = (a) => { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
+  let order = QUIZ.map((_, i) => i);   // indices (dans QUIZ) des questions affichées, dans l'ordre d'affichage
+  // Cible attendue : l'affirmation fausse pour une question `fausse`, la proposition juste sinon.
+  const isTarget = (x, o) => (x.fausse ? !o.ok : o.ok);
+  const hintOf = (x) => (x.fausse ? (x.multi ? 'Coche toutes les affirmations fausses.' : 'Une seule affirmation est fausse : trouve-la.') : x.multi ? 'Coche toutes les bonnes réponses.' : 'Une seule bonne réponse.');
+  // Balisage d'une question (quiz final et vérifications de section) : `name` rend les boutons radio uniques.
+  const questionHtml = (x, name, tag, cls) => `<div class="q ${cls || ''}" data-q="${name}">
+        <p class="qt">${tag}${x.fausse ? '<span class="tag fausse">Trouve la fausse</span>' : ''}${x.multi ? '<span class="tag multi">Plusieurs réponses</span>' : ''}${x.q}</p>
+        <p class="hint">${hintOf(x)}</p>
+        ${x.o.map((o, oi) => `<label class="opt" data-o="${oi}"><input type="${x.multi ? 'checkbox' : 'radio'}" name="${name}"><span class="ot"><span class="st">${o.t}</span><span class="why">${o.ok ? '✓ Vrai. ' : '✗ Faux. '}${o.why}</span>${o.fix ? `<span class="fix"><b>En réalité :</b> ${o.fix}</span>` : ''}</span></label>`).join('')}
+        <div class="row"><label class="f sure"><input type="checkbox" class="sure"> Je suis sûr·e de ma réponse</label><button class="check on">Valider</button></div>
+        <div class="explain"><p class="res"></p><p class="muted refs" hidden></p></div>
+      </div>`;
+  // Correction d'une question : colore les propositions, affiche le verdict. Renvoie { right, sure } ou null si rien n'est coché.
+  // « sûr·e » sert l'hypercorrection : une erreur commise avec confiance est celle que le feedback corrige le mieux.
+  function grade(box, x) {
+    const picked = [...box.querySelectorAll('.opt')].map((l) => l.querySelector('input').checked);
+    if (!picked.some(Boolean)) { box.querySelector('.hint').textContent = 'Choisis au moins une réponse.'; return null; }
+    box.querySelector('.hint').textContent = hintOf(x);
+    let nbOk = 0, nbBad = 0;
+    box.querySelectorAll('.opt').forEach((l, oi) => {
+      const ok = isTarget(x, x.o[oi]), sel = picked[oi];
+      if (!x.o[oi].ok) l.classList.add('isfalse');
+      l.classList.add(ok && sel ? 'good' : !ok && sel ? 'wrong' : ok ? 'miss' : 'neutral');
+      if (ok && sel) nbOk++;
+      if (!ok && sel) nbBad++;
+      l.querySelector('input').disabled = true;
+    });
+    const total = x.o.filter((o) => isTarget(x, o)).length, right = nbOk === total && nbBad === 0, partial = nbOk > 0 && nbBad === 0;
+    const sure = box.querySelector('input.sure').checked;
+    const res = box.querySelector('.res');
+    res.className = 'res ' + (right ? 'ok' : partial ? 'part' : 'ko');
+    res.textContent = right ? (sure ? 'Correct.' : 'Correct, mais tu hésitais : relis la justification pour consolider.')
+      : partial ? `Incomplet : tu as trouvé ${nbOk} bonne(s) réponse(s) sur ${total}.`
+      : (sure ? 'Pas tout à fait. Tu étais sûr·e de toi : c\'est l\'erreur la plus utile à corriger, lis bien la justification.' : 'Pas tout à fait.');
+    box.querySelector('input.sure').disabled = true;
+    box.classList.add('done'); box.querySelector('button.check').disabled = true;
+    // Remédiation : après une erreur (ou une réussite hésitante), renvoyer aux passages exacts. `ref` de la question, et `ref` de chaque proposition si elle en a.
+    if (!right || !sure) {
+      const refs = [];
+      x.o.forEach((o, oi) => { if (o.ref && ((picked[oi] && !isTarget(x, o)) || isTarget(x, o))) refs.push(o.ref); });
+      if (x.ref) refs.push(x.ref);
+      const uniq = [...new Set(refs)].filter((r) => document.querySelector(r));
+      const box2 = box.querySelector('.refs');
+      if (uniq.length) { box2.innerHTML = 'À relire : ' + uniq.map((r) => `<a href="${r}">${esc(refLabel(r))}</a>`).join(' · '); box2.hidden = false; }
+    }
+    announce(res.textContent);
+    return { right, sure };
+  }
+  function renderQuiz() {
+    quizBox.innerHTML = '<div class="quiz-head"><span class="score" id="qscore"></span><span class="row"><button id="qreset">↺ Recommencer</button><button id="qshuf">⇄ Mélanger</button><button id="qmiss"></button><button id="qall">Toutes les questions</button></span></div><p class="muted cal" id="qcal"></p><div class="objbox" id="qobj"></div>'
+      + order.map((qi, pos) => { const x = QUIZ[qi]; return questionHtml(x, 'q' + qi, `<span class="tag ${x.trap ? 'trap' : ''}">${x.trap ? 'Piège' : 'Question ' + (pos + 1)}</span>`); }).join('');
+    updateScore(); updateMissedBtn();
+  }
+  function updateMissedBtn() {
+    const m = loadMissed(), mine = QUIZ.filter((x) => m.some((e) => e.q === x.q)), n = mine.length, ns = mine.filter((x) => m.find((e) => e.q === x.q).sure).length, b = $('#qmiss');
+    b.textContent = `Refaire les ratées (${n}${ns ? `, dont ${ns} avec confiance` : ''})`; b.disabled = n === 0;
+    $('#qall').hidden = order.length === QUIZ.length;
+  }
+  function updateScore() {
+    const done = order.filter((qi) => quizState[qi]), right = done.filter((qi) => quizState[qi].right).length;
+    const sures = done.filter((qi) => quizState[qi].sure), sureRight = sures.filter((qi) => quizState[qi].right).length;
+    $('#qscore').textContent = `Score : ${right} / ${order.length}` + (done.length < order.length ? ` (${done.length} répondue${done.length > 1 ? 's' : ''})` : ' : terminé')
+      + (sures.length ? ` · quand tu étais sûr·e : ${sureRight} / ${sures.length}` : '');
+    // Bilan de calibration, une fois le quiz terminé : la confiance était-elle justifiée ?
+    const cal = $('#qcal'), sureWrong = sures.length - sureRight, hesRight = done.filter((qi) => !quizState[qi].sure && quizState[qi].right).length;
+    cal.textContent = done.length < order.length ? '' : !sures.length
+      ? 'Tu n\'as coché « sûr·e » à aucune question : essaie de te prononcer, c\'est ce qui rend les erreurs instructives.'
+      : sureWrong === 0 ? `Quand tu étais sûr·e (${sures.length} fois), tu avais raison : ta confiance est bien calibrée.${hesRight ? ` Et tu as trouvé juste ${hesRight} fois en hésitant : tu en sais plus que tu ne crois.` : ''}`
+      : `Tu étais sûr·e et tu te trompais ${sureWrong} fois sur ${sures.length} : ce sont tes points à reprendre en priorité. « Refaire les ratées » les met en premier.`;
+    updateObjectives();
+  }
+  // Objectifs : la liste en tête de page se coche au fil du quiz (✓ si toutes les questions de l'objectif sont justes, ✗ si une est ratée),
+  // et un bilan par objectif, avec lien « À relire » pour les ratés, s'affiche quand toutes les questions affichées sont répondues.
+  function updateObjectives() {
+    const lis = [...document.querySelectorAll('#objectifs li[data-obj]')]; if (!lis.length) return;
+    const complete = order.every((qi) => quizState[qi]), rows = [];
+    lis.forEach((li) => {
+      const qs = order.filter((qi) => [].concat(QUIZ[qi].obj || []).includes(li.dataset.obj)), st = qs.filter((qi) => quizState[qi]);
+      const status = st.some((qi) => !quizState[qi].right) ? 'ko' : qs.length && st.length === qs.length ? 'ok' : '';
+      li.className = status;
+      if (qs.length) rows.push({ li, status });
+    });
+    $('#qobj').innerHTML = complete && rows.length ? '<h4>Bilan par objectif</h4><ul class="objs">' + rows.map(({ li, status }) =>
+      `<li class="${status}">${esc(li.textContent.trim())}${status === 'ko' && li.dataset.ref && document.querySelector(li.dataset.ref) ? ` <span class="muted">À relire : <a href="${li.dataset.ref}">${esc(refLabel(li.dataset.ref))}</a></span>` : ''}</li>`).join('') + '</ul>' : '';
+  }
+  quizBox.addEventListener('click', (e) => {
+    if (e.target.id === 'qreset') { quizState.fill(null); renderQuiz(); return; }
+    if (e.target.id === 'qshuf') { shuffle(order); order.forEach((qi) => shuffle(QUIZ[qi].o)); quizState.fill(null); renderQuiz(); return; }
+    if (e.target.id === 'qmiss') {   // les erreurs commises avec confiance passent en premier : ce sont les plus utiles à corriger
+      const m = loadMissed(), sure = (i) => !!(m.find((e) => e.q === QUIZ[i].q) || {}).sure;
+      order = QUIZ.map((_, i) => i).filter((i) => m.some((e) => e.q === QUIZ[i].q)).sort((a, b) => sure(b) - sure(a));
+      quizState.fill(null); renderQuiz(); return;
+    }
+    if (e.target.id === 'qall') { order = QUIZ.map((_, i) => i); quizState.fill(null); renderQuiz(); return; }
+    const btn = e.target.closest('button.check'); if (!btn) return;
+    const box = btn.closest('.q'), qi = +box.dataset.q.slice(1), x = QUIZ[qi];
+    if (quizState[qi]) return;
+    const r = grade(box, x); if (!r) return;
+    quizState[qi] = r;
+    saveMissed(loadMissed().filter((e) => e.q !== x.q).concat(r.right ? [] : [{ q: x.q, sure: r.sure }]));
+    updateScore(); updateMissedBtn();
+  });
+  renderQuiz();
+
+  /* ---------- Vérification de section : une question « trouve la fausse » sur la section 3 seulement ---------- */
+  // UNE SEULE évaluation immédiate par section : s1 a son exemple résolu, s2, s4, s5 et s6 leur prédiction, s3 cette vérification. Hors score, hors des questions du quiz.
+  // { at: '#s1', q, fausse, o: [{ t, ok, why, fix }] } : mêmes champs que QUIZ, `ref` inutile (la section est juste au-dessus).
+  const MINI = [
+    { at: '#s3', q: 'Une de ces affirmations sur <b>late_pool</b> est <b>fausse</b> : laquelle ?', fausse: true,
+      o: [
+        { t: 'Mêmes paramètres veut toujours dire même coût de calcul', ok: false, fix: 'Retarder un pooling garde les paramètres et multiplie les MACs (× 2,37 pour late_pool).', why: 'Les paramètres ne disent pas combien de fois les poids servent.' },
+        { t: 'Retirer le pooling de l\'étage 2 quadruple les positions de l\'étage 3', ok: true, why: 'Cartes de 16 × 16 au lieu de 8 × 8.' },
+        { t: 'late_pool compte 94 762 paramètres, exactement comme s03', ok: true, why: 'Même poids, positions différentes.' },
+        { t: 'Plus de FLOPs n\'a pas donné plus de précision pour late_pool', ok: true, why: '64,43 % contre 67,69 %, moyenne de 3 graines, 4 époques.' },
+      ] },
+  ];
+  MINI.forEach((x, mi) => {
+    const k = (mi * 3 + 2) % x.o.length; x.o = x.o.slice(k).concat(x.o.slice(0, k));   // varier la position de la fausse
+    const sec = $(x.at); if (!sec) return;
+    sec.insertAdjacentHTML('beforeend', questionHtml(x, 'm' + mi, '<span class="tag">Vérifie-toi</span>', 'mini'));
+  });
+  document.addEventListener('click', (e) => {
+    const btn = e.target.closest('.q.mini button.check'); if (!btn) return;
+    const box = btn.closest('.q'); if (box.classList.contains('done')) return;
+    grade(box, MINI[+box.dataset.q.slice(1)]);
+  });
+
+    /* ---------- Progression : section courante, sections manipulées (cochées dans la navigation) ---------- */
+  // « Manipulée » = le lecteur a cliqué ou saisi quelque chose dans la section. Mémorisé dans le navigateur (clé propre à la page).
+  (() => {
+    const secs = [...document.querySelectorAll('main section')].filter((x) => /^s\d+$/.test(x.id));
+    if (!secs.length) return;
+    let done = store.get('progress', []);   // mémoire du navigateur, clé unique par page (noyau)
+    const nav = document.querySelector('nav.top'), wrap = nav.querySelector('.wrap');
+    const pos = document.createElement('span'); pos.className = 'pos'; wrap.append(pos);
+    const bar = document.createElement('div'); bar.className = 'progress'; bar.innerHTML = '<span></span>'; nav.append(bar);
+    const all = [...document.querySelectorAll('main section[id]')];   // toutes les sections (bilan, quiz...) servent à repérer la position courante
+    let cur = secs[0].id;
+    const paint = () => {
+      all.forEach((x) => { const a = nav.querySelector(`a[href="#${x.id}"]`); if (a) { a.classList.toggle('done', done.includes(x.id)); a.classList.toggle('cur', x.id === cur); } });
+      const ca = nav.querySelector(`a[href="#${cur}"]`);   // sur téléphone la navigation défile : garder la section courante visible
+      if (ca && wrap.scrollWidth > wrap.clientWidth) wrap.scrollTo({ left: ca.offsetLeft - 16, behavior: 'smooth' });
+      const k = secs.findIndex((x) => x.id === cur);
+      pos.textContent = (k >= 0 ? `Section ${k + 1} / ${secs.length} · ` : '') + `${done.length} / ${secs.length} manipulée${done.length > 1 ? 's' : ''}`;
+      bar.firstChild.style.width = (100 * done.length / secs.length) + '%';
+    };
+    const mark = (id) => {
+      if (done.includes(id)) return;
+      done.push(id);
+      store.set('progress', done);
+      paint();
+    };
+    const onAct = (e) => {
+      const sec = e.target.closest && e.target.closest('main section');
+      if (sec && secs.includes(sec) && e.target.closest('input, button, textarea, summary, label')) mark(sec.id);
+    };
+    document.addEventListener('click', onAct); document.addEventListener('input', onAct);
+    const io = new IntersectionObserver((es) => { es.forEach((en) => { if (en.isIntersecting) { cur = en.target.id; paint(); } }); }, { rootMargin: '-35% 0px -55% 0px' });
+    all.forEach((x) => io.observe(x)); paint();
+  })();
+
+  /* ---------- Extraits de code : lus dans donnees/*.js ---------- */
+  // Un seul fichier : window.NOM.source = { file, lines } et data-code au format lignes.
+  // Plusieurs fichiers : window.NOM.sources = { "chemin/fichier.py": lignes } et data-code au format fichier@lignes.
+  (() => {
+    const D0 = window.S05;
+    const srcs = D0 && (D0.sources || (D0.source && { [D0.source.file]: D0.source.lines }));
+    const first = srcs && Object.keys(srcs)[0];
+    document.querySelectorAll('.codeblock[data-code]').forEach((d) => {
+      if (!srcs) { d.hidden = true; return; }
+      const groups = d.dataset.code.split(';').map((gp) => { const at = gp.indexOf('@'); return { file: at < 0 ? first : gp.slice(0, at), ranges: (at < 0 ? gp : gp.slice(at + 1)).split(',').map((r) => r.split('-').map(Number)) }; });
+      let html = '';
+      groups.forEach((gp, k) => {
+        const lines = srcs[gp.file] || [];
+        if (groups.length > 1 || k) html += `<span class="fh">${esc(gp.file)}</span>\n`;
+        gp.ranges.forEach(([a, b], i) => {
+          if (i) html += '<span class="gap">⋮</span>\n';
+          for (let n = a; n <= (b || a); n++) html += `<span class="ln">${n}</span>${esc(lines[n - 1])}\n`;
+        });
+      });
+      d.querySelector('pre').innerHTML = html.replace(/\n$/, '');
+      d.querySelector('.cf').textContent = groups.map((gp) => `${gp.file}, l.${gp.ranges.map((r) => r.join('-')).join(' et ')}`).join(' ; ');
+    });
+  })();
+
+  /* ---------- Exemple résolu qui s'efface (cas entièrement résolu, puis à compléter, puis à faire seul) ---------- */
+  // { at: '#s2', title, cases: [{ statement, blank: [] | [indices d'étapes] | 'all', steps: [{ t, a, tol?, dec?, why }] }] }
+  //   Les cas ont les MÊMES étapes dans le même ordre : seuls l'énoncé et les valeurs changent. Typiquement 3 cas : blank [], [1], 'all'.
+  //   a : nombre (comparé avec `tol`, absolu, 0,01 par défaut) ou texte (comparé sans casse ni espaces). Recalculer a avec le modèle de la page.
+  const WORKED = [
+    { at: '#s1', title: 'Refais le calcul d\'une couche', cases: [
+      { statement: '<p>Cas 1 : première convolution de <code>s03</code>, 3 → 32 canaux, noyau 3 × 3, carte de 32 × 32. Étudie chaque étape.</p>', blank: [], steps: [
+        { t: 'Paramètres (c_out · c_in · k · k) :', a: 32 * 3 * 3 * 3, why: 'Le <b>noyau</b> est le même à toutes les positions : il ne dépend ni de H ni de W.' },
+        { t: 'Positions (H · W) :', a: 32 * 32, why: 'Le noyau est pressé une fois par <b>position</b> de la carte (padding = k // 2 garde la taille).' },
+        { t: 'MACs (paramètres · positions) :', a: 32 * 3 * 3 * 3 * 32 * 32, why: 'Chaque position réutilise tous les poids : <b>MACs = paramètres × positions</b>.' },
+        { t: 'FLOPs (2 · MACs) :', a: 2 * 32 * 3 * 3 * 3 * 32 * 32, why: 'Une MAC est une multiplication et une addition : <b>1 MAC = 2 FLOPs</b>.' } ] },
+      { statement: '<p>Cas 2 : deuxième convolution de <code>s03</code>, 32 → 64 canaux, noyau 3 × 3, carte de 16 × 16. Complète les MACs.</p>', blank: [2], steps: [
+        { t: 'Paramètres (c_out · c_in · k · k) :', a: 64 * 32 * 3 * 3, why: 'c_in passe de 3 à 32 et c_out de 32 à 64 : environ <b>21 fois</b> plus de poids que la couche 1.' },
+        { t: 'Positions (H · W) :', a: 16 * 16, why: 'Le pooling a divisé la carte par 2 en largeur et en hauteur : <b>4 fois moins</b> de positions.' },
+        { t: 'MACs (paramètres · positions) :', a: 64 * 32 * 3 * 3 * 16 * 16, why: 'Même règle : <b>paramètres × positions</b>.' },
+        { t: 'FLOPs (2 · MACs) :', a: 2 * 64 * 32 * 3 * 3 * 16 * 16, why: 'Toujours <b>2 FLOPs par MAC</b>.' } ] },
+      { statement: '<p>Cas 3 : dernière convolution de <code>kernel5</code>, 64 → 128 canaux, noyau 5 × 5, carte de 8 × 8. À toi de tout faire.</p>', blank: 'all', steps: [
+        { t: 'Paramètres (c_out · c_in · k · k) :', a: 128 * 64 * 5 * 5, why: 'Le noyau 5 × 5 pèse <b>25</b> poids par paire de canaux au lieu de 9.' },
+        { t: 'Positions (H · W) :', a: 8 * 8, why: 'Deux pooling plus tôt : la carte est de 8 × 8.' },
+        { t: 'MACs (paramètres · positions) :', a: 128 * 64 * 5 * 5 * 8 * 8, why: 'Même règle : <b>paramètres × positions</b>.' },
+        { t: 'FLOPs (2 · MACs) :', a: 2 * 128 * 64 * 5 * 5 * 8 * 8, why: 'Toujours <b>2 FLOPs par MAC</b>.' } ] },
+    ] },
+  ];
+  WORKED.forEach((w, wi) => {
+    const sec = $(w.at); if (!sec) return;
+    const n = w.cases.length, norm = (s) => String(s).toLowerCase().replace(/\s/g, '').replace(',', '.');
+    const blank = (c, si) => c.blank === 'all' || (Array.isArray(c.blank) && c.blank.includes(si));
+    const show = (st) => (typeof st.a === 'number' ? st.a.toLocaleString('fr-FR', { maximumFractionDigits: st.dec ?? 2 }) : st.a);
+    const caseHtml = (c, ci) => {
+      const nb = c.steps.filter((_, si) => blank(c, si)).length;
+      const label = nb === 0 ? 'Exemple résolu : étudie chaque étape' : nb === c.steps.length ? 'À faire seul·e' : 'À compléter';
+      return `<div class="wcase${ci ? ' wait' : ''}" data-ci="${ci}"${ci ? ' inert' : ''}>
+        <p class="wtag">Cas ${ci + 1} sur ${n} · ${label}</p><div>${c.statement}</div>
+        <ol>${c.steps.map((st, si) => (blank(c, si)
+          ? `<li>${st.t} <input type="text" data-si="${si}" autocomplete="off" aria-label="Étape ${si + 1}">${typeof st.a === 'number' ? ` <span class="muted">(à ± ${fr(st.tol ?? 0.01, String(st.tol ?? 0.01).split('.')[1]?.length || 0)} près)</span>` : ''} <span class="fb"></span><span class="why" hidden>${st.why}</span></li>`
+          : `<li>${st.t} <span class="wval">${show(st)}</span><span class="why">${st.why}</span></li>`)).join('')}</ol>
+        <div class="row">${nb ? '<button class="on wcheck">Vérifier</button><button class="wsolve">Montrer la solution</button>' : ''}<button class="on wnext"${nb ? ' hidden' : ''}>${ci < n - 1 ? 'J\'ai compris : cas suivant' : 'Terminé'}</button></div></div>`;
+    };
+    const el = document.createElement('div'); el.className = 'worked'; el.id = 'w' + wi;
+    el.innerHTML = `<h3>${w.title}</h3><p class="muted">Trois passes : tu regardes un cas résolu, puis tu complètes, puis tu le fais seul·e. Le soutien disparaît à chaque cas.</p>` + w.cases.map(caseHtml).join('');
+    const mini = sec.querySelector('.q.mini');
+    if (mini) mini.before(el); else sec.append(el);
+    el.addEventListener('click', (e) => {
+      const box = e.target.closest('.wcase'); if (!box) return;
+      const c = w.cases[+box.dataset.ci];
+      const reveal = () => box.querySelectorAll('li .why').forEach((x) => { x.hidden = false; });
+      if (e.target.closest('.wcheck')) {
+        let allOk = true;
+        box.querySelectorAll('input[type="text"]').forEach((inp) => {
+          const st = c.steps[+inp.dataset.si], v = inp.value.trim(), fb = inp.parentElement.querySelector('.fb');
+          const ok = typeof st.a === 'number' ? v !== '' && Math.abs(parseFloat(v.replace(/\s/g, '').replace(',', '.')) - st.a) <= (st.tol ?? 0.01) : norm(v) === norm(st.a);
+          fb.className = 'fb ' + (ok ? 'ok' : 'ko'); fb.textContent = ok ? '✓' : '✗ réessaie, ou montre la solution';
+          if (ok) inp.disabled = true; else allOk = false;
+        });
+        reveal();
+        if (allOk) box.querySelector('.wnext').hidden = false;
+        announce(allOk ? 'Correct.' : 'Pas encore : corrige les étapes marquées, ou montre la solution.');
+      }
+      if (e.target.closest('.wsolve')) {
+        box.querySelectorAll('input[type="text"]').forEach((inp) => { const st = c.steps[+inp.dataset.si]; inp.value = show(st); inp.disabled = true; const fb = inp.parentElement.querySelector('.fb'); fb.className = 'fb'; fb.textContent = '(solution)'; });
+        reveal(); box.querySelector('.wnext').hidden = false;
+      }
+      if (e.target.closest('.wnext')) {
+        e.target.closest('.wnext').hidden = true;
+        const next = el.querySelector(`.wcase[data-ci="${+box.dataset.ci + 1}"]`);
+        if (next) { next.classList.remove('wait'); next.removeAttribute('inert'); const f = next.querySelector('input[type="text"]'); if (f) f.focus(); }
+      }
+    });
+    el.addEventListener('keydown', (e) => { if (e.key === 'Enter' && e.target.matches('input[type="text"]')) { e.preventDefault(); const b = e.target.closest('.wcase').querySelector('.wcheck'); if (b) b.click(); } });
+  });
+
+  /* ---------- Prédire avant de voir : la zone interactive reste grisée tant qu'on n'a pas répondu ---------- */
+  // Une prédiction par moment clé (3 ou 4 par page) : le résultat qui contredit l'intuition ou le piège du sujet.
+  // target : sélecteur de la zone interactive à griser ; ok : index de la bonne proposition (équilibrer les longueurs, comme au quiz) ;
+  // reveal : texte de la révélation, calculé depuis les vraies données quand c'est possible (jamais écrit de mémoire).
+  const PRED = [
+    { id: 'p1', target: '#s2c', q: 'On retire BatchNorm et ReLU de s03 sans toucher aux convolutions : que deviennent les FLOPs comptés par PyTorch ?',
+      o: ['Ils baissent d\'environ moitié', 'Ils baissent d\'un petit pourcentage', 'Ils restent exactement les mêmes', 'Ils augmentent légèrement'], ok: 2,
+      reveal: () => (D ? `PyTorch mesure <b>${fmt(D.counter.s03Flops)} FLOPs</b> avec BatchNorm et ReLU, <b>${fmt(D.counter.withoutBnRelu)}</b> sans : exactement les mêmes. Vérifie-le dans la zone ci-dessous.` : 'Les FLOPs restent exactement les mêmes : le compteur ne voit que les convolutions et les Linear.') },
+    { id: 'p2', target: '#s4c', q: 'Sur mps, on arrête l\'horloge sans appeler synchronize : que mesure-t-on ?',
+      o: ['Le calcul complet, avec un peu de bruit', 'Surtout le temps de soumission des opérations', 'Le calcul complet moins le warm-up', 'Le même temps que sur le CPU'], ok: 1,
+      reveal: () => { const r = sim(20, 30, 100); return `Dans la simulation jouet (20 opérations, 30 µs de soumission, 100 µs de calcul), l'horloge sans synchronize lit <b>${fmt(r.nosync)} µs</b> contre <b>${fmt(r.sync)} µs</b> avec : <b>× ${fr(r.sync / r.nosync, 1)} trop bas</b>. Le palier n'a pas mesuré cette variante, la page montre le mécanisme.`; } },
+    { id: 'p3', target: '#s6a', q: 'À batch 1 (une seule image), quel device est le plus rapide sur ce Mac M4 ?',
+      o: ['mps pour les six configs', 'Le CPU pour les six configs', 'mps pour les gros, CPU pour les petits', 'Aucun écart notable entre eux'], ok: 1,
+      reveal: () => { if (!D) return 'Le CPU gagne pour les six configs.'; const rs = ratios(1), w = rs.filter((r) => r.win === 'CPU').length, lo = rs.reduce((a, r) => (r.x < a.x ? r : a)), hi = rs.reduce((a, r) => (r.x > a.x ? r : a)); return `Le CPU gagne pour <b>${w} configs sur 6</b>, de <b>× ${fr(lo.x, 1)}</b> (${lo.n}) à <b>× ${fr(hi.x, 1)}</b> (${hi.n}). Bascule sur batch 64 pour voir l'inverse.`; } },
+    { id: 'p4', target: '#s7c', q: 'Le classement par MACs prédit-il mieux la latence à batch 1 ou à batch 64 ?',
+      o: ['Mieux à batch 1, sur les deux devices', 'Mieux à batch 64, sur les deux devices', 'Pareil partout : les MACs suffisent', 'Mieux sur mps, quel que soit le batch'], ok: 1,
+      reveal: () => (D ? `ρ vaut <b>${fr(rho('macs_b1', 'latency_mps_b64_ms'), 2)}</b> (mps batch 64) et <b>${fr(rho('macs_b1', 'latency_cpu_b64_ms'), 2)}</b> (CPU batch 64), contre ${fr(rho('macs_b1', 'latency_mps_b1_ms'), 2)} (mps batch 1) et ${fr(rho('macs_b1', 'latency_cpu_b1_ms'), 2)} (CPU batch 1). Clique les cases pour voir les paires inversées.` : 'Le classement est meilleur à batch 64 : à batch 1 la latence est dominée par un coût fixe.') },
+  ];
+  PRED.forEach((p) => {
+    const target = $(p.target); if (!target) return;
+    const box = document.createElement('div'); box.className = 'predict'; box.id = p.id;
+    box.innerHTML = `<h4>Prédis d'abord</h4><p>${p.q}</p>` + p.o.map((t, i) => `<label class="opt" data-o="${i}"><input type="radio" name="${p.id}"><span class="ot">${t}</span></label>`).join('')
+      + '<div class="row"><button class="on pv">Valider ma prédiction</button><button class="skip">Passer, je veux juste explorer</button></div><p class="muted pmsg"></p><div class="tip pres" hidden></div>';
+    target.before(box);
+    target.classList.add('locked'); target.setAttribute('inert', '');
+    const unlock = () => { target.classList.remove('locked'); target.removeAttribute('inert'); box.querySelectorAll('input,button').forEach((b) => { b.disabled = true; }); };
+    box.querySelector('.skip').addEventListener('click', unlock);
+    box.querySelector('.pv').addEventListener('click', () => {
+      const idx = [...box.querySelectorAll('input')].findIndex((i) => i.checked);
+      if (idx < 0) { box.querySelector('.pmsg').textContent = 'Choisis une réponse, ou passe.'; return; }
+      box.querySelectorAll('.opt').forEach((l, i) => l.classList.add(i === p.ok ? (i === idx ? 'good' : 'miss') : i === idx ? 'wrong' : 'neutral'));
+      const pres = box.querySelector('.pres'); pres.hidden = false;
+      pres.innerHTML = `<b>${idx === p.ok ? 'Bien vu.' : 'Pas tout à fait : tu avais prédit autre chose.'}</b> ${p.reveal()}`;
+      box.querySelector('.pmsg').textContent = '';
+      announce(pres.textContent);
+      unlock();
+    });
+  });
+
+  /* ---------- Explique avec tes mots (questions de la porte, texte libre + points à cocher) ---------- */
+  // Les questions que le projet exige de savoir traiter sans le dépôt, avec les points attendus (3 à 5 par question).
+  const PORTE = [
+    { q: 'Quelle est la différence entre MACs et FLOPs, et que compte (et ne compte pas) <code>FlopCounterMode</code> ?', pts: ['1 MAC = une multiplication + une addition = 2 FLOPs ; macs_b1 = flops_b1 // 2.', 'Il compte les convolutions et les produits matriciels (Linear) : MACs d\'une convolution = paramètres × positions.', 'Il ignore BatchNorm, ReLU, pooling et les biais : retirer BatchNorm et ReLU ne change pas le total.', 'C\'est donc un minimum de calcul, qui ne dit rien de la mémoire ni du nombre d\'opérations lancées.'] },
+    { q: 'Pourquoi faut-il appeler <code>torch.mps.synchronize()</code> avant d\'arrêter le chronomètre sur mps, et que mesurerait-on sans cela ?', pts: ['Sur mps les opérations sont asynchrones : Python dépose les opérations dans la file du GPU et rend la main.', 'Sans synchronize, perf_counter ne mesure que la soumission des opérations, pas leur exécution.', 'La latence est donc sous-estimée, d\'autant plus que le calcul est long face à la soumission.', 'Le code synchronise après l\'échauffement et après chaque passe ; sur CPU l\'appel ne fait rien.'] },
+    { q: 'Pourquoi le classement par FLOPs et le classement par latence peuvent-ils diverger, et lequel utiliserais-tu comme objectif dans un NAS ciblant un matériel précis ?', pts: ['La latence dépend du matériel, du batch, de la mémoire et du nombre d\'opérations lancées ; les FLOPs n\'en voient qu\'une partie.', 'Chiffres du palier : ρ = 1,00 sur mps batch 64, 0,89 sur CPU batch 64, 0,60 (mps) et 0,66 (CPU) à batch 1 ; wide et deep inversés sur CPU malgré 2 % de MACs d\'écart.', 'Les FLOPs donnent un ordre de grandeur et un filtre grossier, pas l\'ordre fin entre configs proches.', 'Objectif d\'un NAS ciblant un matériel : la latence mesurée sur ce matériel et ce batch, avec le protocole warm-up, synchronize, médiane.'] },
+  ];
+  const loadPorte = () => store.get('porte', {});   // `store` : mémoire du navigateur, clé unique par page (définie dans le noyau)
+  const savePorte = (v) => store.set('porte', v);
+  (() => {
+    const saved = loadPorte();
+    $('#porteBox').innerHTML = PORTE.map((x, i) => `<div class="porte-q" data-i="${i}"><p><b>${i + 1}.</b> ${x.q}</p>
+      <textarea aria-label="Ta réponse à la question ${i + 1}" placeholder="Écris ta réponse avec tes mots, sans regarder la page."></textarea>
+      <div class="row"><button class="on reveal">Voir les points attendus</button></div>
+      <div class="pts" hidden>${x.pts.map((t, k) => `<label><input type="checkbox" data-k="${k}"><span>${t}</span></label>`).join('')}<p class="muted sc"></p></div></div>`).join('');
+    document.querySelectorAll('.porte-q').forEach((box) => {
+      const i = +box.dataset.i, ta = box.querySelector('textarea'), s = saved[i] || {};
+      ta.value = s.text || '';
+      const score = () => { const n = box.querySelectorAll('.pts input:checked').length; box.querySelector('.sc').textContent = `Points que tu avais : ${n} / ${PORTE[i].pts.length}. Ceux que tu n'as pas cochés sont à relire dans les sections 1 à 6.`; };
+      const persist = () => { const all = loadPorte(); all[i] = { text: ta.value, got: [...box.querySelectorAll('.pts input')].map((c) => c.checked) }; savePorte(all); };
+      ta.addEventListener('input', persist);
+      box.querySelector('.reveal').addEventListener('click', () => { box.querySelector('.pts').hidden = false; box.querySelector('.reveal').disabled = true; score(); });
+      box.querySelectorAll('.pts input').forEach((c, k) => { c.checked = !!(s.got && s.got[k]); c.addEventListener('change', () => { score(); persist(); }); });
+    });
+  })();
+
+  /* ---------- Transfert : une question dans une situation nouvelle ---------- */
+  // Réponse chiffrée : { setup, q, answer, tol, dec?, unit?, hint?, why }
+  //   answer : nombre, ou fonction qui le recalcule avec le MODÈLE DE LA PAGE (préférable : jamais un chiffre écrit de mémoire) ;
+  //   tol    : tolérance absolue, AFFICHÉE au lecteur (« Précision acceptée : ± tol ») ; au moins une demi-unité du dernier chiffre
+  //            qu'il est raisonnable de calculer à la main (41,29 attendu : tol 0,5 si on demande l'ordre de grandeur, pas 0,02) ; why : la démarche refaite pas à pas, affichée après validation.
+  // « Trouve la fausse » : { setup, q, fausse: true, o: [{ t, ok, why, fix }] } (mêmes champs que QUIZ).
+  const TRANSFERT = [
+    { setup: '<p>Tu réutilises le réseau <code>s03</code> (étages 32, 64, 128, pooling à chaque étage) sur des images de <b>64 × 64</b> au lieu de 32 × 32. La tête <code>AdaptiveAvgPool2d</code> accepte cette taille sans changement, et les convolutions gardent la taille de leur carte.</p>',
+      q: 'Combien de MACs (en millions) pour une image 64 × 64 ?', answer: () => build(PRESETS.s03, 64).macs / 1e6, tol: 0.5, dec: 2, unit: 'M de MACs', hint: 'Les paramètres ne changent pas : que devient le nombre de positions de chaque convolution ? Et la tête Linear ?',
+      why: 'Chaque carte a <b>4 fois plus de positions</b> (64 · 64 au lieu de 32 · 32), les poids sont inchangés : les convolutions passent de 10 321 920 à 41 287 680 MACs. La tête <code>Linear</code> (128 · 10 = 1 280 MACs) ne bouge pas, car <code>AdaptiveAvgPool2d</code> ramène toujours à 1 × 1. Total : 41 288 960 MACs, soit environ 41,29 M ; les paramètres restent 94 762.' },
+    { setup: '<p>Un collègue mesure la latence de <code>s03</code> sur mps avec une boucle sans <code>synchronize</code> : 10 passes de warm-up, 50 passes chronométrées, médiane. Il en tire quatre conclusions.</p>',
+      q: 'Laquelle de ses conclusions est <b>fausse</b> ?', fausse: true,
+      o: [
+        { t: 'La médiane de 50 passes compense l\'oubli de synchronize : ses chiffres sont fiables', ok: false, fix: 'La médiane réduit le bruit, pas le biais : sans synchronize, chaque passe ne mesure que la soumission.', why: 'La médiane de 50 mesures biaisées reste une mesure biaisée, car le défaut est le même à chaque passe.' },
+        { t: 'Ses latences seront trop basses, surtout si le calcul est long face à la soumission', ok: true, why: 'Le GPU calcule encore quand l\'horloge s\'arrête.' },
+        { t: 'Deux modèles de calcul très différent pourraient lui sembler aussi rapides', ok: true, why: 'Si la soumission domine, elle masque le calcul.' },
+        { t: 'Comparer ses chiffres mps à ceux du CPU l\'induirait en erreur sur le gagnant', ok: true, why: 'Le biais ne touche que mps, dont la latence est sous-estimée.' },
+      ] },
+  ];
+  (() => {
+    const box = $('#transfertBox'); if (!box) return;
+    box.innerHTML = TRANSFERT.map((x, i) => {
+      if (x.o) { const k = (i * 3 + 1) % x.o.length; x.o = x.o.slice(k).concat(x.o.slice(0, k)); return questionHtml(x, 't' + i, '<span class="tag">Transfert</span>', 'transfer'); }
+      return `<div class="q transfer" data-q="t${i}"><p class="qt"><span class="tag">Transfert</span>${x.q}</p>
+        <p class="hint">Saisis un nombre${x.unit ? ' (en ' + x.unit + ')' : ''}. Précision acceptée : ± ${fr(x.tol, String(x.tol).split('.')[1]?.length || 0)}.</p>
+        ${x.hint ? `<details class="hintbox"><summary>Un indice</summary><p>${x.hint}</p></details>` : ''}
+        <div class="row"><input type="text" class="tans" inputmode="decimal" autocomplete="off" aria-label="Ta réponse">${x.unit ? `<span>${x.unit}</span>` : ''}
+          <label class="f sure"><input type="checkbox" class="sure"> Je suis sûr·e de ma réponse</label><button class="check on">Valider</button></div>
+        <div class="explain"><p class="res"></p><p class="why"></p></div></div>`;
+    }).join('');
+    TRANSFERT.forEach((x, i) => { if (x.setup) box.querySelector(`.q[data-q="t${i}"] .qt`).insertAdjacentHTML('afterend', `<div class="setup">${x.setup}</div>`); });
+    box.addEventListener('click', (e) => {
+      const btn = e.target.closest('button.check'); if (!btn) return;
+      const q = btn.closest('.q'); if (q.classList.contains('done')) return;
+      const x = TRANSFERT[+q.dataset.q.slice(1)];
+      if (x.o) { grade(q, x); return; }
+      const raw = q.querySelector('.tans').value.replace(/\s/g, '').replace(',', '.'), v = parseFloat(raw);
+      if (raw === '' || Number.isNaN(v)) { q.querySelector('.hint').textContent = 'Saisis un nombre (la virgule est acceptée).'; return; }
+      const target = typeof x.answer === 'function' ? x.answer() : x.answer, right = Math.abs(v - target) <= x.tol, sure = q.querySelector('input.sure').checked;
+      const res = q.querySelector('.res');
+      res.className = 'res ' + (right ? 'ok' : 'ko');
+      const near = !right && Math.abs(v - target) <= Math.max(1, Math.abs(target)) * 0.05;
+      res.textContent = right ? (sure ? 'Correct.' : 'Correct, mais tu hésitais : relis la démarche pour consolider.')
+        : (near ? `Très proche, mais hors de la précision demandée (± ${fr(x.tol, String(x.tol).split('.')[1]?.length || 0)}) : ` : 'Pas tout à fait : ') + `la réponse attendue est ${fr(target, x.dec ?? (Number.isInteger(target) ? 0 : 2))}${x.unit ? ' ' + x.unit : ''}.` + (sure ? ' Tu étais sûr·e de toi : c\'est l\'erreur la plus utile à corriger, lis la démarche.' : '');
+      q.querySelector('.why').innerHTML = x.why;
+      q.querySelector('.tans').disabled = true; q.querySelector('input.sure').disabled = true; btn.disabled = true; q.classList.add('done');
+      announce(res.textContent);
+    });
+    box.addEventListener('keydown', (e) => { if (e.key === 'Enter' && e.target.classList.contains('tans')) { e.preventDefault(); e.target.closest('.q').querySelector('button.check').click(); } });
+  })();
+
+
+
+  /* Variabilité d'un run à l'autre : remplace les « 48 % » de secours par la valeur calculée sur les données. */
+  (() => {
+    if (!D) return;
+    const all = []; D.runs.forEach((r) => KEYS.forEach(([k]) => all.push(spreadOf(r, k))));
+    const top = Math.max(...all);
+    document.querySelectorAll('.spreadtop').forEach((el) => { el.textContent = `${fr(100 * top, 0)} %`; });
+  })();
+
+  /* Blocs de code repliés par défaut (la page reste courte) ; un bouton les déplie ou les replie tous. */
+  (() => {
+    const blocks = [...document.querySelectorAll('.codeblock[data-code]')].filter((d) => !d.hidden);
+    if (blocks.length < 2) return;
+    const bar = document.createElement('div'); bar.className = 'row codebar';
+    bar.innerHTML = '<button class="codeall">Déplier tous les extraits de code</button><span class="muted">Chaque section a son extrait du vrai code, replié par défaut.</span>';
+    const first = document.querySelector('main > section'); if (first) first.before(bar);
+    const btn = bar.querySelector('button');
+    btn.addEventListener('click', () => { const open = blocks.some((d) => !d.open); blocks.forEach((d) => { d.open = open; }); btn.textContent = open ? 'Replier tous les extraits de code' : 'Déplier tous les extraits de code'; });
+  })();
+
+  /* ---------- Démarrage ---------- */
+  buildRows(); refresh(); renderS4(); renderS5(); renderS6(); renderS6warn(); renderS7(); renderS7warn(); renderS8();
+})();
+</script>
+</body>
+</html>
