@@ -26,7 +26,7 @@ Spec de référence : `docs/superpowers/specs/2026-10-12-cnn-pytorch-design.md`.
 | 3 | CNN sur CIFAR-10 | `Conv2d`, `BatchNorm`, formes `(B, C, H, W)`, scheduler, checkpoint | Terminé ([rapport](experiments/s03-cnn-cifar.md)) |
 | 4 | CNN configurable depuis un dict | `Sequential`/`ModuleList`, pooling global, validation de config | Terminé ([rapport](experiments/s04-cnn-config.md)) |
 | 5 | Coût d'un modèle | paramètres, FLOPs, latence mps et CPU, compromis précision / coût | Terminé ([rapport](experiments/s05-cost.md)) |
-| 6 | Random search et front de Pareto | exploration d'architectures et compromis multi-objectifs | Reporté (non commencé) |
+| 6 | Random search et front de Pareto | exploration d'architectures et compromis multi-objectifs | Terminé ([rapport](experiments/s06-pareto.md)) |
 
 ## Démarrage rapide
 
@@ -41,6 +41,7 @@ uv run python -m steps.s02_mlp_fashion --seed 0   # télécharge FashionMNIST da
 uv run python -m steps.s03_cnn_cifar --seed 0     # télécharge CIFAR-10 dans data/
 uv run python -m steps.s05_cost --seed 0          # grille de 6 configs : plusieurs dizaines de minutes
 uv run python -m common.results s05 config_name val_acc   # synthèse moyenne et écart-type par config
+uv run python -m steps.s06_pareto --n-models 15 --epochs 3 --seed 42  # benchmark NAS et frontières de Pareto
 ```
 
 ## Résultats
@@ -92,9 +93,18 @@ Tous les résultats ci-dessous sont extraits des rapports de mesure dans `experi
   2. **Parallélisme en batch 64** : mps reprend l'avantage massif dès que le lot augmente, se montrant 3 à 6 fois plus rapide que le CPU (5,2 ms vs 33,9 ms pour `deep`).
   3. **FLOPs vs latence matérielle** : les FLOPs ne prédisent pas toujours la latence. En batch 64 sur CPU, `wide` est plus rapide que `deep` (26,0 ms vs 33,9 ms) malgré plus de FLOPs, car ses couches plus larges vectorisent mieux et réduisent les accès mémoire.
 
+### Palier 6 : Random Search et Frontières de Pareto multi-objectifs sur CIFAR-10
+* Dispositif : exploration aléatoire d'un espace de recherche (2 à 4 étages, canaux 16 à 128, noyaux 3 et 5, 1 ou 2 blocs par étage, pooling libre) sur 15 architectures distinctes entraînées 3 époques chacune (`seed=42`).
+* Résultats majeurs :
+  * Modèle dominant en précision : `arch_14` (1,79M params, 338 M MACs) atteint **82,36 %** en 3 époques et domine l'ensemble de l'espace.
+  * Modèle le plus efficient : `arch_09` (1,48M params, 188 M MACs) atteint **79,36 %** en 99 secondes et domine strictement `arch_02` (79,30 %, 740 M MACs, 315 s de calcul) avec 4 fois moins d'opérations.
+  * Frontière de Pareto Précision vs FLOPs : `arch_01` (63,66 %, 5,36 M MACs), `arch_15` (66,84 %, 20,23 M MACs), `arch_09` (79,36 %, 188,32 M MACs), `arch_14` (82,36 %, 338,04 M MACs).
+  * Basculement sur petit lot (mps batch 1) : `arch_13`, `arch_03`, `arch_06`, `arch_14`. Les FLOPs échouent à prédire la latence en batch 1 : 3 architectures sur 4 du front théorique sont éliminées sur matériel réel au profit de modèles à plus faible overhead d'ordonnancement.
+  * Inefficience du Random Search : 73 % des architectures échantillonnées sont dominées, justifiant le recours à l'Optimisation Bayésienne (BO) en NAS.
+
 ## English summary
 
-A five-step PyTorch curriculum building a miniature NAS: autograd on a two-neuron network, an MLP on FashionMNIST, a CNN on CIFAR-10, a CNN built from a config dict, and a cost benchmark (parameters, FLOPs, mps and CPU latency) over a grid of six configurations. Each step has a short measured write-up (in French), a written prediction made before training, and CPU-only tests. The code is written by an AI assistant under the direction of the repository owner, who designed the curriculum and the protocol and reviews every result. Random search and a Pareto front are planned as a sixth step.
+A six-step PyTorch curriculum building a miniature NAS: autograd on a two-neuron network, an MLP on FashionMNIST, a CNN on CIFAR-10, a CNN built from a config dict, a cost benchmark (parameters, FLOPs, mps and CPU latency) over a grid of six configurations, and a multi-objective random search computing Pareto frontiers. Each step has a short measured write-up (in French), a written prediction made before training, and CPU-only tests. The code is written by an AI assistant under the direction of the repository owner, who designed the curriculum and the protocol and reviews every result.
 
 ## Limites
 
