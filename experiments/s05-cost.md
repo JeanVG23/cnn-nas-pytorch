@@ -50,8 +50,8 @@ Recoupement ponctuel sur CPU (batch 1, architecture `s03`) :
 
 ## 5. Surprises et échecs
 
-* Le CPU bat systématiquement le GPU (mps) sur batch 1 : pour chaque architecture, la latence CPU en batch 1 est 2 à 5 fois plus faible que sur mps (par exemple 0,142 ms contre 0,680 ms pour `tiny`). Sur un petit volume de calcul (une seule image 32x32), le temps d'inférence GPU est dominé par l'overhead de soumission (pont Python vers Metal et ordonnancement GPU), alors que le CPU traite les données immédiatement en cache L1/L2.
-* À l'inverse, sur batch 64, le GPU sature ses unités de calcul et écrase le CPU : mps est 3 à 6 fois plus rapide que le CPU (par exemple 5,238 ms contre 33,928 ms pour `deep`).
+* Le CPU bat systématiquement le GPU (mps) sur batch 1 : pour chaque architecture, la latence CPU en batch 1 est 1,4 à 4,8 fois plus faible que sur mps (par exemple 0,142 ms contre 0,680 ms pour `tiny`, mais 0,346 ms contre 0,466 ms pour `late_pool`). Sur un petit volume de calcul (une seule image 32x32), le temps d'inférence GPU est dominé par l'overhead de soumission (pont Python vers Metal et ordonnancement GPU), alors que le CPU traite les données immédiatement en cache L1/L2.
+* À l'inverse, sur batch 64, le GPU sature ses unités de calcul et écrase le CPU : mps est 1,7 à 6,5 fois plus rapide que le CPU (par exemple 5,238 ms contre 33,928 ms pour `deep`, mais 2,456 ms contre 4,243 ms pour `tiny`).
 * Divergence entre FLOPs et latence selon le matériel :
   * Sur `mps` en batch 64, `deep` (77,27 M FLOPs) est plus rapide que `wide` (79,04 M FLOPs) : 5,238 ms contre 5,957 ms.
   * Mais sur `cpu` en batch 64, c'est l'inverse : `wide` est plus rapide que `deep` (26,032 ms contre 33,928 ms), car les 6 convolutions séquentielles de `deep` créent plus de transferts mémoire et de défauts de cache CPU que les convolutions plus larges et vectorisables de `wide`. Le classement par FLOPs ne prédit donc pas fidèlement la latence.

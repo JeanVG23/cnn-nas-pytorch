@@ -25,7 +25,11 @@ ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(ROOT))
 
 from steps import s06_pareto  # noqa: E402
-from steps.s06_pareto import compute_pareto_front, generate_search_space, sample_config  # noqa: E402
+from steps.s06_pareto import (  # noqa: E402
+    compute_pareto_front,
+    generate_search_space,
+    sample_config,
+)
 
 OUT_DIR = ROOT / "explications" / "s06-pareto" / "donnees"
 SOURCES = ["steps/s06_pareto.py", "steps/s04_cnn_config.py"]

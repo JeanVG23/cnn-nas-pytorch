@@ -7,7 +7,6 @@ __pycache__/
 
 # Datasets et artefacts volumineux
 data/
-experiments/results/
 
 # Fichiers de configuration IDE/Assistants locaux
 CLAUDE.md

@@ -1,12 +1,12 @@
 # cnn_pytorch : un mini-NAS PyTorch construit pas à pas
 
-Un parcours en 5 paliers pour devenir opérationnel sur PyTorch : du gradient d'un réseau à 2 neurones jusqu'à la mesure du coût (paramètres, FLOPs, latence) d'une grille de CNNs configurables, avec un rapport chiffré par palier. L'objectif est **pédagogique** et prépare un stage de recherche d'architectures neuronales (NAS) : lire et écrire du code PyTorch propre, mesurer honnêtement, rester reproductible.
+Un parcours en 6 paliers pour devenir opérationnel sur PyTorch : du gradient d'un réseau à 2 neurones jusqu'à la mesure du coût (paramètres, FLOPs, latence) d'une grille de CNNs configurables, puis à une recherche aléatoire d'architectures et à ses fronts de Pareto, avec un rapport chiffré par palier. L'objectif est **pédagogique** et prépare un stage de recherche d'architectures neuronales (NAS) : lire et écrire du code PyTorch propre, mesurer honnêtement, rester reproductible.
 
 **Accès rapide** : [Méthode de travail](#méthode-de-travail) · [Parcours](#parcours) · [Démarrage rapide](#démarrage-rapide) · [Résultats](#résultats) · [English summary](#english-summary) · [Limites](#limites)
 
 ## Méthode de travail
 
-Je n'ai pas écrit le code de ce dépôt : il est écrit par un assistant IA sous ma direction. Ma part : la conception (ordre des paliers, périmètre, ce que l'on mesure), le protocole, la relecture critique des résultats et la compréhension de chaque mécanisme.
+Je n'ai écrit aucune ligne du code de ce dépôt : il est écrit par un assistant IA sous ma direction. Ma part : la conception (ordre des paliers, périmètre, ce que l'on mesure), le protocole, les prédictions écrites avant chaque mesure, la relecture critique des résultats et la compréhension de chaque mécanisme.
 
 Chaque palier suit un protocole allégé :
 1. **Prédiction chiffrée** écrite avant tout entraînement (une prédiction fausse est un résultat utile).
@@ -17,7 +17,7 @@ Chaque palier suit un protocole allégé :
 
 ## Parcours
 
-Spec de référence : `docs/superpowers/specs/2026-10-12-cnn-pytorch-design.md`.
+La spec de conception et le plan d'implémentation sont locaux et ne sont pas publiés.
 
 | N° | Palier | Ce qu'il enseigne | Statut |
 |---|---|---|---|
@@ -89,17 +89,17 @@ Tous les résultats ci-dessous sont extraits des rapports de mesure dans `experi
 | `wide` | 373 834 | 39,52 | 79,04 | 71,79 % ± 0,55 % | 0,690 ms | 5,957 ms | 0,325 ms | 26,032 ms | 45,1 s |
 
 * Enseignements clés sur le coût :
-  1. **Surcoût de soumission en batch 1** : le CPU est 2 à 5 fois plus rapide que le GPU (mps) sur une seule image (0,142 ms vs 0,680 ms pour `tiny`) car l'overhead Python-Metal domine le calcul.
-  2. **Parallélisme en batch 64** : mps reprend l'avantage massif dès que le lot augmente, se montrant 3 à 6 fois plus rapide que le CPU (5,2 ms vs 33,9 ms pour `deep`).
+  1. **Surcoût de soumission en batch 1** : le CPU est 1,4 à 4,8 fois plus rapide que le GPU (mps) sur une seule image (0,142 ms vs 0,680 ms pour `tiny`, mais seulement 0,346 ms vs 0,466 ms pour `late_pool`) car l'overhead Python-Metal domine le calcul.
+  2. **Parallélisme en batch 64** : mps reprend l'avantage massif dès que le lot augmente, se montrant 1,7 à 6,5 fois plus rapide que le CPU (5,2 ms vs 33,9 ms pour `deep`, mais 2,5 ms vs 4,2 ms pour `tiny`).
   3. **FLOPs vs latence matérielle** : les FLOPs ne prédisent pas toujours la latence. En batch 64 sur CPU, `wide` est plus rapide que `deep` (26,0 ms vs 33,9 ms) malgré plus de FLOPs, car ses couches plus larges vectorisent mieux et réduisent les accès mémoire.
 
 ### Palier 6 : Random Search et Frontières de Pareto multi-objectifs sur CIFAR-10
 * Dispositif : exploration aléatoire d'un espace de recherche (2 à 4 étages, canaux 16 à 128, noyaux 3 et 5, 1 ou 2 blocs par étage, pooling libre) sur 15 architectures distinctes entraînées 3 époques chacune (`seed=42`).
 * Résultats majeurs :
-  * Modèle dominant en précision : `arch_14` (1,79M params, 338 M MACs) atteint **82,36 %** en 3 époques et domine l'ensemble de l'espace.
-  * Modèle le plus efficient : `arch_09` (1,48M params, 188 M MACs) atteint **79,36 %** en 99 secondes et domine strictement `arch_02` (79,30 %, 740 M MACs, 315 s de calcul) avec 4 fois moins d'opérations.
+  * Modèle le plus précis : `arch_14` (1,79M params, 338 M MACs) atteint **82,36 %** en 3 époques. Il est sur la frontière, mais ne domine pas l'espace : `arch_01` (5,36 M MACs, 63,66 %) y est aussi non dominé.
+  * Modèle efficient : `arch_09` (1,48M params, 188 M MACs) atteint **79,36 %** en 99 secondes et domine au sens de Pareto `arch_02` (79,30 %, 740 M MACs, 315 s de calcul) avec 4 fois moins d'opérations. L'écart de précision (0,06 point, une graine) est dans le bruit ; seul l'écart de coût est net.
   * Frontière de Pareto Précision vs FLOPs : `arch_01` (63,66 %, 5,36 M MACs), `arch_15` (66,84 %, 20,23 M MACs), `arch_09` (79,36 %, 188,32 M MACs), `arch_14` (82,36 %, 338,04 M MACs).
-  * Basculement sur petit lot (mps batch 1) : `arch_13`, `arch_03`, `arch_06`, `arch_14`. Les FLOPs échouent à prédire la latence en batch 1 : 3 architectures sur 4 du front théorique sont éliminées sur matériel réel au profit de modèles à plus faible overhead d'ordonnancement.
+  * Basculement sur petit lot (mps batch 1) : `arch_13`, `arch_03`, `arch_06`, `arch_14`. Les FLOPs prédisent mal la latence sur mps en batch 1 (corrélation de rang MACs / latence de 0,60, contre 0,94 sur CPU batch 1 et 0,98 sur mps batch 64) : 3 architectures sur 4 du front théorique sont éliminées sur matériel réel au profit de modèles à plus faible overhead d'ordonnancement.
   * Inefficience du Random Search : 73 % des architectures échantillonnées sont dominées, justifiant le recours à l'Optimisation Bayésienne (BO) en NAS.
 
 ## English summary
@@ -112,5 +112,6 @@ A six-step PyTorch curriculum building a miniature NAS: autograd on a two-neuron
 * `mps` n'est pas déterministe bit-à-bit : deux exécutions de même graine peuvent différer légèrement.
 * La latence sur mps en batch 1 est dominée par le coût de soumission des opérations ; elle dit peu sur un autre matériel.
 * `FlopCounterMode` ne compte que les produits matriciels et les convolutions (pas les activations, le pooling ni BatchNorm).
-* Les entraînements durent quelques époques : les classements de précision entre configs sont indicatifs.
+* Les entraînements durent quelques époques : les classements de précision entre configs sont indicatifs. Au palier 6, chaque architecture est entraînée 3 époques avec une seule graine et sa latence est mesurée une fois : les écarts de précision inférieurs à un demi-point ne se lisent pas.
+* Le palier 6 est une recherche aléatoire servant de référence, pas un NAS guidé : l'intérêt d'une optimisation bayésienne est une hypothèse issue de la prédiction, non mesurée.
 * Un seul auteur de l'évaluation, sans second relecteur.

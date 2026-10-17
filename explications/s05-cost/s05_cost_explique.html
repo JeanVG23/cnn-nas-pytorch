@@ -865,7 +865,7 @@ table.pt td.wrap2 { white-space: normal; min-width: 200px; }
     if (!D) return;
     const r1 = ratios(1), r64 = ratios(64), lo1 = r1.reduce((a, r) => (r.x < a.x ? r : a)), hi1 = r1.reduce((a, r) => (r.x > a.x ? r : a)), lo64 = r64.reduce((a, r) => (r.x < a.x ? r : a)), hi64 = r64.reduce((a, r) => (r.x > a.x ? r : a));
     const n2 = r1.filter((r) => r.x < 2).length, n3 = r64.filter((r) => r.x < 3).length;
-    $('#s6warn').innerHTML = `<b>Écart avec le rapport.</b> Le rapport (section 5) écrit que le CPU est « 2 à 5 fois » plus rapide à batch 1 et que mps est « 3 à 6 fois » plus rapide à batch 64. Avec les nombres de son tableau (médianes de 3 runs), le rapport CPU / mps va de × ${fr(lo1.x, 1)} (${lo1.n}) à × ${fr(hi1.x, 1)} (${hi1.n}) à batch 1, dont ${n2} config${n2 > 1 ? 's' : ''} sous × 2, et de × ${fr(lo64.x, 1)} (${lo64.n}) à × ${fr(hi64.x, 1)} (${hi64.n}) à batch 64, dont ${n3} config${n3 > 1 ? 's' : ''} sous × 3. À corriger dans le rapport avant de le citer.`;
+    $('#s6warn').innerHTML = `<b>Fourchettes mesurées.</b> Le rapport initial écrivait « 2 à 5 fois » à batch 1 et « 3 à 6 fois » à batch 64, ce qui était trop serré ; il a été corrigé le 17 octobre 2026. Avec les nombres de son tableau (médianes de 3 runs), le rapport CPU / mps va de × ${fr(lo1.x, 1)} (${lo1.n}) à × ${fr(hi1.x, 1)} (${hi1.n}) à batch 1, dont ${n2} config${n2 > 1 ? 's' : ''} sous × 2, et de × ${fr(lo64.x, 1)} (${lo64.n}) à × ${fr(hi64.x, 1)} (${hi64.n}) à batch 64, dont ${n3} config${n3 > 1 ? 's' : ''} sous × 3.`;
   }
 
   /* 7. Les MACs classent-ils la latence ? Spearman et paires inversées */

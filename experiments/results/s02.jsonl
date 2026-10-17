@@ -1,0 +1,3 @@
+{"step": "s02", "seed": 0, "epochs": 10, "lr": 0.001, "batch_size": 128, "n_params": 235146, "train_seconds": 23.98, "val_loss": 0.3029, "val_acc": 0.8964, "device": "mps", "python": "3.12.13", "torch": "2.14.1"}
+{"step": "s02", "seed": 1, "epochs": 10, "lr": 0.001, "batch_size": 128, "n_params": 235146, "train_seconds": 22.03, "val_loss": 0.3054, "val_acc": 0.8958, "device": "mps", "python": "3.12.13", "torch": "2.14.1"}
+{"step": "s02", "seed": 2, "epochs": 10, "lr": 0.001, "batch_size": 128, "n_params": 235146, "train_seconds": 22.4, "val_loss": 0.3076, "val_acc": 0.8962, "device": "mps", "python": "3.12.13", "torch": "2.14.1"}

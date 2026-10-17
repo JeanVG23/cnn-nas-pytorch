@@ -492,9 +492,9 @@ footer { padding: 36px 0 60px; color: var(--muted); font-size: .85rem; }
     </ul>
   </div>
   <details class="card" id="ecarts"><summary>Écarts avec le rapport ou le code (pour l'auteur)</summary>
-    <p>Le rapport conclut que <b>4 fois moins de calcul donne une meilleure précision</b> (<code>arch_09</code> contre <code>arch_02</code>) : la dominance est vraie, mais 0,06 point est sous le bruit entre graines. Seul « même précision, 4 fois moins de MACs » tient.</p>
-    <p>Le rapport écrit que, <b>comme prédit</b>, les FLOPs ne prédisent pas la latence en batch 1 : vrai à mps (ρ = 0,60), mais sur CPU batch 1 le classement par MACs tient (ρ = 0,94, calcul de la page).</p>
-    <p><b>Plan :</b> 20 à 30 architectures prévues, 15 faites ; la spec et <code>GEMINI.md</code> disent encore le palier 6 « reporté ».</p>
+    <p>Le rapport initial concluait que <b>4 fois moins de calcul donne une meilleure précision</b> (<code>arch_09</code> contre <code>arch_02</code>) : la dominance est vraie, mais 0,06 point est sous le bruit entre graines. Seul « même précision, 4 fois moins de MACs » tient. Rapport et README corrigés le 17 octobre 2026.</p>
+    <p>Le rapport initial écrivait que, <b>comme prédit</b>, les FLOPs ne prédisent pas la latence en batch 1 : vrai à mps (ρ = 0,60), mais sur CPU batch 1 le classement par MACs tient (ρ = 0,94, calcul de la page). Rapport et README précisés le 17 octobre 2026.</p>
+    <p><b>Plan :</b> 20 à 30 architectures prévues, 15 faites ; la spec (locale) dit encore le palier 6 « reporté ».</p>
   </details>
   <div class="card" id="pont">
     <h3>Où ça reviendra dans les prochaines étapes</h3>

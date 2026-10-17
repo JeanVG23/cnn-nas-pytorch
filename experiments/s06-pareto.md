@@ -62,16 +62,16 @@ Résultats complets des 15 architectures tirées au sort, triées par précision
 ## 5. Surprises et enseignements
 
 * Confirmation éclatante de la divergence FLOPs vs Latence sur petit lot :
-  Comme prédit par Jean, les FLOPs ne prédisent pas la latence en batch 1.
+  Comme prédit par Jean, les FLOPs ne prédisent pas la latence en batch 1 sur mps (corrélation de rang de Spearman entre MACs et latence : 0,60). La prédiction ne tient pas partout : sur CPU en batch 1 le classement par MACs reste bon (0,94), de même qu'à batch 64 (0,98 sur mps, 0,96 sur CPU).
   Par exemple, `arch_01` compte seulement 5,36 M MACs mais met 1,066 ms à s'exécuter sur mps en batch 1. À l'opposé, `arch_13` compte 19,76 M MACs (presque 4 fois plus !) mais s'exécute en seulement 0,785 ms sur mps. L'overhead d'ordonnancement de 4 petits étages pénalise plus `arch_01` que le volume de calcul de `arch_13`.
   Conséquence en ingénierie : un ingénieur NAS qui optimiserait uniquement sur les FLOPs déploierait une architecture sous-optimale pour un capteur temps réel.
 * Inefficience massive du Random Search et justification de l'Optimisation Bayésienne (BO) :
   Sur 15 tirages, 11 modèles (73 %) sont strictement dominés. Les trois modèles géants sans pooling initial (`arch_08`, `arch_10`, `arch_11`) ont consommé à eux seuls 1 268 secondes de calcul (soit 47 % du budget de calcul total du palier !) pour des précisions médiocres comprises entre 63 % et 73 %.
   Comme pressenti par Jean, un algorithme guidé par modèle de substitution (comme BOHB ou BANANAS en NAS bayésien) aurait appris dès le premier échec qu'omettre le pooling sur 128 canaux est une impasse, évitant de gaspiller du temps de GPU sur `arch_10` et `arch_11`.
 * Victoire de l'architecture `arch_14` :
-  Avec 1,79M paramètres et 338 M MACs, elle franchit les 82,36 % en seulement 3 époques d'entraînement. Sa conception (2 étages avec pooling précoce, puis un étage de 128 canaux sans pooling pour accumuler de la profondeur sémantique) en fait le modèle dominant sur l'ensemble des métriques de précision.
+  Avec 1,79M paramètres et 338 M MACs, elle franchit les 82,36 % en seulement 3 époques d'entraînement. Sa conception (2 étages avec pooling précoce, puis un étage de 128 canaux sans pooling pour accumuler de la profondeur sémantique) en fait le modèle le plus précis de la grille. Il est sur la frontière, mais ne domine pas l'espace : `arch_01` (5,36 M MACs, 63,66 %) y est tout aussi non dominé.
 * Efficacité spectaculaire de `arch_09` :
-  1,48M paramètres, 188 M MACs, 79,36 % de précision en seulement 99 secondes d'entraînement. Elle domine strictement `arch_02` (79,30 %, 740 M MACs, 315 s d'entraînement), prouvant qu'avoir 4 fois moins de calculs permet une convergence plus rapide et une meilleure précision.
+  1,48M paramètres, 188 M MACs, 79,36 % de précision en seulement 99 secondes d'entraînement. Elle domine au sens de Pareto `arch_02` (79,30 %, 740 M MACs, 315 s d'entraînement). L'écart de précision (0,06 point, une graine, 3 époques) est dans le bruit, bien en dessous des écarts-types du palier 5 (0,1 à 0,9 point) : ce qui est net, c'est que 4 fois moins de calculs n'ont pas coûté de précision mesurable.
 
 ## 6. Questions à savoir traiter sans le dépôt
 
